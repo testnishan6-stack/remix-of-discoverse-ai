@@ -1,39 +1,100 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
-  Sparkles, ChevronLeft, ChevronRight, Play, Pause,
-  Volume2, Share2, RotateCcw, ZoomIn, ZoomOut, Maximize2, Atom,
+  Sparkles, ChevronLeft, ChevronRight, Play, Pause, Square,
+  Volume2, VolumeX, Share2, RotateCcw, ZoomIn, ZoomOut, Maximize2, Atom, Loader2, Wand2,
 } from "lucide-react";
 import { ModelViewer } from "./ModelViewer";
 import { useApp } from "@/contexts/AppContext";
+import { useTTS } from "@/hooks/useTTS";
 import { supabase } from "@/integrations/supabase/client";
+import { Progress } from "@/components/ui/progress";
 
-const demoSteps = [
-  { title: "Overview: The Human Heart", part: "", narrationEn: "The human heart is a muscular organ roughly the size of your fist. It beats about 100,000 times a day, pumping blood throughout your body.", narrationHi: "मानव हृदय एक पेशीय अंग है जो लगभग आपकी मुट्ठी के आकार का होता है। यह दिन में लगभग 1,00,000 बार धड़कता है।", labelEn: "Heart", labelHi: "हृदय", color: "#CC4444" },
-  { title: "The Left Ventricle: The Powerhouse", part: "left_ventricle", narrationEn: "The left ventricle is the strongest chamber. It pumps oxygenated blood to the entire body through the aorta.", narrationHi: "बायां निलय सबसे शक्तिशाली कक्ष है। यह महाधमनी के माध्यम से पूरे शरीर में ऑक्सीजन युक्त रक्त पंप करता है।", labelEn: "Left Ventricle", labelHi: "बायां निलय", color: "#8B0000" },
-  { title: "The Aorta: Highway of Life", part: "aorta", narrationEn: "The aorta is the largest artery in your body, carrying oxygen-rich blood from the left ventricle to all organs.", narrationHi: "महाधमनी आपके शरीर की सबसे बड़ी धमनी है।", labelEn: "Aorta", labelHi: "महाधमनी", color: "#CC2222" },
-  { title: "The Right Atrium: Receiving Chamber", part: "right_atrium", narrationEn: "The right atrium receives deoxygenated blood from the body through the vena cava.", narrationHi: "दायां अलिंद वेना कावा के माध्यम से शरीर से रक्त प्राप्त करता है।", labelEn: "Right Atrium", labelHi: "दायां अलिंद", color: "#4444AA" },
-  { title: "The Complete Cardiac Cycle", part: "", narrationEn: "All chambers work together in perfect rhythm, ensuring continuous blood flow throughout your body.", narrationHi: "सभी कक्ष एक साथ लयबद्ध तरीके से काम करते हैं।", labelEn: "Cardiac Cycle", labelHi: "हृदय चक्र", color: "#CC4444" },
-];
+interface SimStep {
+  title: string;
+  part: string;
+  color: string;
+  narration_en: string;
+  narration_hi: string;
+  label_en: string;
+  label_hi: string;
+  camera?: { x: number; y: number; z: number };
+}
+
+interface Simulation {
+  title: string;
+  steps: SimStep[];
+}
 
 const topicSuggestions = ["Human Heart", "DNA Structure", "Solar System", "Atom Model", "Cell Division", "Water Molecule"];
 
 export function LearnView() {
   const [currentStep, setCurrentStep] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [hasSimulation, setHasSimulation] = useState(false);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const [simulation, setSimulation] = useState<Simulation | null>(null);
   const [topicInput, setTopicInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("");
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [modelParts, setModelParts] = useState<string[]>([]);
-  const { language } = useApp();
+  const [isMuted, setIsMuted] = useState(false);
+  const { language, setLanguage } = useApp();
+  const { speak, stop: stopTTS, isSpeaking } = useTTS();
+  const autoPlayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const step = demoSteps[currentStep];
+  const step = simulation?.steps[currentStep];
+
+  // Auto-play logic
+  useEffect(() => {
+    if (!isAutoPlaying || !simulation) return;
+    
+    // Speak current step
+    if (!isMuted && step) {
+      const text = language === "en" ? step.narration_en : step.narration_hi;
+      speak(text, language);
+    }
+
+    autoPlayRef.current = setTimeout(() => {
+      if (currentStep < simulation.steps.length - 1) {
+        setCurrentStep(prev => prev + 1);
+      } else {
+        setIsAutoPlaying(false);
+      }
+    }, 8000);
+
+    return () => {
+      if (autoPlayRef.current) clearTimeout(autoPlayRef.current);
+    };
+  }, [isAutoPlaying, currentStep, simulation, isMuted, language]);
+
+  const handlePlayNarration = () => {
+    if (isSpeaking) {
+      stopTTS();
+      return;
+    }
+    if (step) {
+      const text = language === "en" ? step.narration_en : step.narration_hi;
+      speak(text, language);
+    }
+  };
+
+  const handleAutoPlay = () => {
+    if (isAutoPlaying) {
+      setIsAutoPlaying(false);
+      stopTTS();
+    } else {
+      setIsAutoPlaying(true);
+    }
+  };
 
   const handleGenerate = async (topic?: string) => {
     const t = topic || topicInput;
     if (!t.trim()) return;
     setTopicInput(t);
     setIsLoading(true);
+    setSimulation(null);
+    setLoadingProgress(10);
+    setLoadingMsg("Searching for 3D models...");
 
     // Search for model in database
     const slug = t.toLowerCase().replace(/\s+/g, "_");
@@ -46,22 +107,103 @@ export function LearnView() {
       .limit(1)
       .maybeSingle();
 
+    setLoadingProgress(30);
+
     if (model?.file_url) {
       setModelUrl(model.file_url);
+      setLoadingMsg("Model found! Generating AI simulation...");
     } else {
       setModelUrl(null);
+      setLoadingMsg("No model found. Generating AI simulation...");
     }
 
-    setTimeout(() => {
-      setIsLoading(false);
-      setHasSimulation(true);
+    setLoadingProgress(50);
+
+    // Check cache first
+    if (model?.id) {
+      const { data: cached } = await supabase
+        .from("simulation_cache")
+        .select("*")
+        .eq("model_id", model.id)
+        .eq("language", "en")
+        .maybeSingle();
+
+      if (cached?.ai_response) {
+        setLoadingProgress(90);
+        setLoadingMsg("Loading cached simulation...");
+        const sim = cached.ai_response as unknown as Simulation;
+        setSimulation(sim);
+        setCurrentStep(0);
+        setLoadingProgress(100);
+        // Increment serve count
+        await supabase.from("simulation_cache").update({ serve_count: (cached.serve_count || 0) + 1 }).eq("id", cached.id);
+        setTimeout(() => setIsLoading(false), 300);
+        return;
+      }
+    }
+
+    // Call AI enhancement
+    setLoadingMsg("AI is creating your simulation...");
+    setLoadingProgress(60);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("enhance-model", {
+        body: {
+          modelName: t,
+          subject: model?.subject || "science",
+          namedParts: model?.named_parts || modelParts,
+          language: "en",
+        },
+      });
+
+      if (error) throw error;
+
+      setLoadingProgress(85);
+      setLoadingMsg("Finalizing experience...");
+
+      if (data && data.steps) {
+        setSimulation(data as Simulation);
+        setCurrentStep(0);
+
+        // Cache it if we have a model
+        if (model?.id) {
+          await supabase.from("simulation_cache").insert({
+            model_id: model.id,
+            language: "en",
+            ai_response: data,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("AI enhancement failed:", err);
+      // Fallback simulation
+      setSimulation({
+        title: t,
+        steps: [
+          { title: `Exploring ${t}`, part: "", color: "#CC4444", narration_en: `Let's explore the fascinating world of ${t}. This is an interactive 3D learning experience.`, narration_hi: `आइए ${t} की आकर्षक दुनिया का पता लगाएं।`, label_en: t, label_hi: t, camera: { x: 0, y: 0, z: 4 } },
+          { title: "Key Features", part: "", color: "#4488CC", narration_en: `${t} has many interesting features that we'll explore step by step.`, narration_hi: `${t} की कई दिलचस्प विशेषताएं हैं।`, label_en: "Features", label_hi: "विशेषताएं", camera: { x: 2, y: 1, z: 3 } },
+          { title: "Summary", part: "", color: "#44AA44", narration_en: `That concludes our exploration of ${t}. Keep learning and exploring!`, narration_hi: `${t} की हमारी खोज यहीं समाप्त होती है। सीखते रहें!`, label_en: "Summary", label_hi: "सारांश", camera: { x: 0, y: 0, z: 4 } },
+        ],
+      });
       setCurrentStep(0);
-    }, 1500);
+    }
+
+    setLoadingProgress(100);
+    setTimeout(() => setIsLoading(false), 400);
   };
 
   const onPartsLoaded = useCallback((parts: string[]) => {
     setModelParts(parts);
   }, []);
+
+  const goStep = (dir: number) => {
+    if (!simulation) return;
+    stopTTS();
+    const next = currentStep + dir;
+    if (next >= 0 && next < simulation.steps.length) {
+      setCurrentStep(next);
+    }
+  };
 
   return (
     <div className="flex flex-col md:flex-row h-full">
@@ -81,8 +223,10 @@ export function LearnView() {
           </div>
           <button
             onClick={() => handleGenerate()}
-            className="bg-primary text-primary-foreground px-5 rounded-xl text-[13px] font-medium hover:opacity-90 transition-opacity active:scale-[0.97]"
+            disabled={isLoading || !topicInput.trim()}
+            className="bg-primary text-primary-foreground px-5 rounded-xl text-[13px] font-medium hover:opacity-90 transition-opacity active:scale-[0.97] disabled:opacity-40 flex items-center gap-2"
           >
+            {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
             Generate
           </button>
         </div>
@@ -93,7 +237,8 @@ export function LearnView() {
             <button
               key={t}
               onClick={() => handleGenerate(t)}
-              className="shrink-0 px-3 py-1.5 bg-card border border-border rounded-lg text-[12px] text-secondary-custom hover:border-accent hover:text-accent transition-all duration-150"
+              disabled={isLoading}
+              className="shrink-0 px-3 py-1.5 bg-card border border-border rounded-lg text-[12px] text-secondary-custom hover:border-accent hover:text-accent transition-all duration-150 disabled:opacity-40"
             >
               {t}
             </button>
@@ -103,28 +248,32 @@ export function LearnView() {
         {/* 3D Canvas */}
         <div className="flex-1 bg-canvas rounded-2xl border border-subtle overflow-hidden relative min-h-[280px] shadow-sm">
           {isLoading ? (
-            <div className="h-full flex flex-col items-center justify-center">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-border overflow-hidden">
-                <div className="h-full bg-accent rounded-full" style={{ width: "65%", transition: "width 1.5s ease-out" }} />
+            <div className="h-full flex flex-col items-center justify-center gap-4 px-8">
+              <div className="w-full max-w-xs">
+                <Progress value={loadingProgress} className="h-1.5" />
               </div>
-              <Atom size={48} strokeWidth={1} className="text-tertiary-custom mb-3 animate-spin" style={{ animationDuration: "3s" }} />
-              <p className="text-[14px] text-secondary-custom">Searching for the best model...</p>
-              <p className="text-[12px] text-tertiary-custom mt-1">{topicInput}</p>
+              <Atom size={40} strokeWidth={1} className="text-accent animate-spin" style={{ animationDuration: "3s" }} />
+              <div className="text-center">
+                <p className="text-[14px] text-primary-custom font-medium">{loadingMsg}</p>
+                <p className="text-[12px] text-tertiary-custom mt-1">{topicInput}</p>
+              </div>
             </div>
-          ) : hasSimulation ? (
+          ) : simulation ? (
             <>
               <ModelViewer
                 modelUrl={modelUrl}
-                highlightPart={step.part || undefined}
-                highlightColor={step.color}
+                highlightPart={step?.part || undefined}
+                highlightColor={step?.color}
                 onPartsLoaded={onPartsLoaded}
               />
-              {/* Label overlay */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-card/90 backdrop-blur-sm border border-border px-4 py-2 rounded-xl shadow-sm animate-fade-in" key={currentStep}>
-                <p className="text-[13px] font-medium text-primary-custom">
-                  {language === "en" ? step.labelEn : step.labelHi}
-                </p>
-              </div>
+              {/* Part label overlay */}
+              {step && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-card/90 backdrop-blur-sm border border-border px-4 py-2 rounded-xl shadow-sm animate-fade-in" key={currentStep}>
+                  <p className="text-[13px] font-medium text-primary-custom">
+                    {language === "en" ? step.label_en : step.label_hi}
+                  </p>
+                </div>
+              )}
               {/* Canvas controls */}
               <div className="absolute top-3 right-3 flex flex-col gap-0.5 bg-card/90 backdrop-blur-sm border border-border rounded-xl p-1">
                 {[RotateCcw, ZoomIn, ZoomOut, Maximize2].map((Icon, i) => (
@@ -132,6 +281,12 @@ export function LearnView() {
                     <Icon size={14} strokeWidth={1.5} className="text-secondary-custom" />
                   </button>
                 ))}
+              </div>
+              {/* Step indicator */}
+              <div className="absolute top-3 left-3 bg-card/90 backdrop-blur-sm border border-border rounded-lg px-2.5 py-1">
+                <span className="text-[11px] font-medium text-secondary-custom">
+                  Step {currentStep + 1}/{simulation.steps.length}
+                </span>
               </div>
             </>
           ) : (
@@ -143,27 +298,30 @@ export function LearnView() {
       </div>
 
       {/* Step Panel */}
-      {hasSimulation && !isLoading && (
+      {simulation && !isLoading && (
         <div className="md:w-[360px] lg:w-[380px] bg-card border-t md:border-t-0 md:border-l border-subtle flex flex-col shrink-0">
           <div className="p-5 pb-0">
-            <h2 className="text-[18px] font-semibold text-primary-custom">{topicInput || "Simulation"}</h2>
-            <p className="text-[12px] text-tertiary-custom mt-1">Interactive 3D · {demoSteps.length} Steps</p>
+            <h2 className="text-[18px] font-semibold text-primary-custom">{simulation.title || topicInput}</h2>
+            <p className="text-[12px] text-tertiary-custom mt-1">
+              AI-Generated · {simulation.steps.length} Steps
+              {isAutoPlaying && <span className="text-accent ml-1">● Auto-playing</span>}
+            </p>
           </div>
 
           {/* Step nav */}
           <div className="px-5 pt-4 flex items-center justify-between">
-            <span className="label-text text-tertiary-custom">Step {currentStep + 1} of {demoSteps.length}</span>
+            <span className="label-text text-tertiary-custom">Step {currentStep + 1} of {simulation.steps.length}</span>
             <div className="flex gap-1">
               <button
-                onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
+                onClick={() => goStep(-1)}
                 disabled={currentStep === 0}
                 className="p-1.5 border border-border rounded-lg disabled:opacity-20 hover:bg-background-secondary transition-colors"
               >
                 <ChevronLeft size={14} strokeWidth={1.5} />
               </button>
               <button
-                onClick={() => setCurrentStep(Math.min(demoSteps.length - 1, currentStep + 1))}
-                disabled={currentStep === demoSteps.length - 1}
+                onClick={() => goStep(1)}
+                disabled={currentStep === simulation.steps.length - 1}
                 className="p-1.5 border border-border rounded-lg disabled:opacity-20 hover:bg-background-secondary transition-colors"
               >
                 <ChevronRight size={14} strokeWidth={1.5} />
@@ -171,64 +329,93 @@ export function LearnView() {
             </div>
           </div>
 
-          {/* Dots */}
+          {/* Progress dots */}
           <div className="flex justify-center gap-1.5 py-4 px-5">
-            {demoSteps.map((_, i) => (
+            {simulation.steps.map((s, i) => (
               <button
                 key={i}
-                onClick={() => setCurrentStep(i)}
+                onClick={() => { stopTTS(); setCurrentStep(i); }}
                 className="h-2 rounded-full transition-all"
                 style={{
                   width: i === currentStep ? 20 : 8,
-                  backgroundColor: i === currentStep ? "hsl(var(--accent))" : "hsl(var(--border))",
+                  backgroundColor: i === currentStep ? "hsl(var(--accent))" : i < currentStep ? "hsl(var(--accent) / 0.4)" : "hsl(var(--border))",
                   transition: "width 250ms ease-in-out, background-color 150ms",
                 }}
               />
             ))}
           </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto px-5 animate-fade-in" key={currentStep}>
-            <h3 className="text-[16px] font-semibold text-primary-custom mb-2">{step.title}</h3>
-            <p className="text-[14px] text-secondary-custom leading-relaxed">
-              {language === "en" ? step.narrationEn : step.narrationHi}
-            </p>
-            {/* Audio indicator */}
-            <div className="flex items-center gap-2 mt-4">
-              <div className="flex items-end gap-[2px]">
-                {[10, 16, 7].map((h, i) => (
-                  <div
-                    key={i}
-                    className="w-[2.5px] bg-accent rounded-full transition-all"
-                    style={{ height: isPlaying ? h : 3, transitionDuration: "300ms", transitionDelay: `${i * 80}ms` }}
-                  />
-                ))}
+          {/* Step content */}
+          {step && (
+            <div className="flex-1 overflow-y-auto px-5 animate-fade-in" key={currentStep}>
+              <div className="flex items-center gap-2 mb-2">
+                {step.color && (
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: step.color }} />
+                )}
+                <h3 className="text-[16px] font-semibold text-primary-custom">{step.title}</h3>
               </div>
-              <span className="text-[11px] text-tertiary-custom">
-                {isPlaying ? (language === "en" ? "Speaking in English" : "हिंदी में बोल रहा है") : "Ready to play"}
-              </span>
+              <p className="text-[14px] text-secondary-custom leading-relaxed">
+                {language === "en" ? step.narration_en : step.narration_hi}
+              </p>
+              {/* Speaking indicator */}
+              <div className="flex items-center gap-2 mt-4">
+                <div className="flex items-end gap-[2px]">
+                  {[10, 16, 7, 12].map((h, i) => (
+                    <div
+                      key={i}
+                      className="w-[2.5px] bg-accent rounded-full transition-all"
+                      style={{ height: isSpeaking ? h : 3, transitionDuration: "300ms", transitionDelay: `${i * 80}ms` }}
+                    />
+                  ))}
+                </div>
+                <span className="text-[11px] text-tertiary-custom">
+                  {isSpeaking
+                    ? (language === "en" ? "Speaking in English" : "हिंदी में बोल रहा है")
+                    : "Tap play to listen"}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Playback */}
+          {/* Playback controls */}
           <div className="p-4 border-t border-subtle flex items-center justify-between">
             <div className="flex rounded-full overflow-hidden border border-border h-7">
               {(["en", "hi"] as const).map((l) => (
-                <button key={l} className={`px-2.5 text-[11px] font-medium transition-colors ${
-                  language === l ? "bg-accent text-accent-foreground" : "text-secondary-custom"
-                }`}>
+                <button
+                  key={l}
+                  onClick={() => { stopTTS(); setLanguage(l); }}
+                  className={`px-2.5 text-[11px] font-medium transition-colors ${
+                    language === l ? "bg-accent text-accent-foreground" : "text-secondary-custom hover:bg-background-secondary"
+                  }`}
+                >
                   {l === "en" ? "EN" : "हिं"}
                 </button>
               ))}
             </div>
-            <button
-              onClick={() => setIsPlaying(!isPlaying)}
-              className="w-10 h-10 rounded-full bg-primary flex items-center justify-center hover:opacity-90 transition-opacity active:scale-[0.97]"
-            >
-              {isPlaying ? <Pause size={16} className="text-primary-foreground" /> : <Play size={16} className="text-primary-foreground ml-0.5" />}
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePlayNarration}
+                className="w-8 h-8 rounded-full bg-card border border-border flex items-center justify-center hover:bg-background-secondary transition-colors"
+                title={isSpeaking ? "Stop narration" : "Play narration"}
+              >
+                {isSpeaking ? <Square size={12} className="text-accent" /> : <Volume2 size={14} className="text-secondary-custom" />}
+              </button>
+              <button
+                onClick={handleAutoPlay}
+                className="w-10 h-10 rounded-full bg-primary flex items-center justify-center hover:opacity-90 transition-opacity active:scale-[0.97]"
+                title={isAutoPlaying ? "Stop auto-play" : "Auto-play all steps"}
+              >
+                {isAutoPlaying ? <Pause size={16} className="text-primary-foreground" /> : <Play size={16} className="text-primary-foreground ml-0.5" />}
+              </button>
+            </div>
+
             <div className="flex gap-2.5">
-              <Volume2 size={16} strokeWidth={1.5} className="text-tertiary-custom cursor-pointer hover:text-secondary-custom transition-colors" />
+              <button onClick={() => setIsMuted(!isMuted)}>
+                {isMuted
+                  ? <VolumeX size={16} strokeWidth={1.5} className="text-tertiary-custom hover:text-secondary-custom transition-colors" />
+                  : <Volume2 size={16} strokeWidth={1.5} className="text-tertiary-custom hover:text-secondary-custom transition-colors" />}
+              </button>
               <Share2 size={16} strokeWidth={1.5} className="text-tertiary-custom cursor-pointer hover:text-secondary-custom transition-colors" />
             </div>
           </div>
