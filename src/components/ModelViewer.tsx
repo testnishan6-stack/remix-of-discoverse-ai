@@ -36,7 +36,35 @@ function AutoFitModel({ url, highlightPart, highlightColor, onPartsLoaded }: { u
   const groupRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
 
-  const clonedScene = useMemo(() => scene.clone(true), [scene]);
+  const clonedScene = useMemo(() => {
+    const clone = scene.clone(true);
+    // Convert all materials to MeshStandardMaterial so highlighting always works
+    // (handles KHR_materials_pbrSpecularGlossiness and other non-standard materials)
+    clone.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const convertMat = (mat: THREE.Material): THREE.MeshStandardMaterial => {
+        if (mat instanceof THREE.MeshStandardMaterial) return mat;
+        const oldMat = mat as THREE.Material & { color?: THREE.Color; map?: THREE.Texture | null; opacity?: number; transparent?: boolean };
+        const newMat = new THREE.MeshStandardMaterial({
+          color: oldMat.color instanceof THREE.Color ? oldMat.color.clone() : new THREE.Color(0x888888),
+          map: oldMat.map || null,
+          opacity: typeof oldMat.opacity === "number" ? oldMat.opacity : 1,
+          transparent: !!oldMat.transparent,
+          side: mat.side,
+          roughness: 0.7,
+          metalness: 0.1,
+        });
+        return newMat;
+      };
+      if (Array.isArray(mesh.material)) {
+        mesh.material = mesh.material.map(convertMat);
+      } else {
+        mesh.material = convertMat(mesh.material);
+      }
+    });
+    return clone;
+  }, [scene]);
 
   const meshNames = useMemo(() => {
     const parts: string[] = [];
