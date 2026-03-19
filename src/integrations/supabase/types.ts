@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_agents: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          created_by: string | null
+          greeting_message: string
+          id: string
+          is_published: boolean
+          knowledge_areas: string[] | null
+          language_style: string
+          name: string
+          personality: string
+          research_papers: string[] | null
+          slug: string
+          system_prompt: string
+          updated_at: string
+          voice_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          greeting_message?: string
+          id?: string
+          is_published?: boolean
+          knowledge_areas?: string[] | null
+          language_style?: string
+          name: string
+          personality?: string
+          research_papers?: string[] | null
+          slug: string
+          system_prompt: string
+          updated_at?: string
+          voice_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          greeting_message?: string
+          id?: string
+          is_published?: boolean
+          knowledge_areas?: string[] | null
+          language_style?: string
+          name?: string
+          personality?: string
+          research_papers?: string[] | null
+          slug?: string
+          system_prompt?: string
+          updated_at?: string
+          voice_id?: string | null
+        }
+        Relationships: []
+      }
       models: {
         Row: {
           class_levels: number[] | null
