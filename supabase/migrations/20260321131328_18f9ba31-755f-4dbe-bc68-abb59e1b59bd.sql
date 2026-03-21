@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS user_library_user_model_unique ON public.user_library (user_id, model_id);
