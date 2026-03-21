@@ -17,6 +17,7 @@ interface Agent {
   voice_id: string | null;
   knowledge_areas: string[];
   created_by: string | null;
+  avatar_url: string | null;
 }
 
 export function ChatView() {
@@ -37,7 +38,7 @@ export function ChatView() {
     const loadAgents = async () => {
       const { data } = await supabase
         .from("ai_agents")
-        .select("id, name, slug, personality, greeting_message, voice_id, knowledge_areas, created_by")
+        .select("id, name, slug, personality, greeting_message, voice_id, knowledge_areas, created_by, avatar_url")
         .eq("is_published", true);
       if (data && data.length > 0) setAgents(data);
     };
@@ -84,13 +85,13 @@ export function ChatView() {
     (a.knowledge_areas || []).some(k => k.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  // ── Agent List View ──
+  // ── Agent Grid View (Mobile-first) ──
   if (showAgentList && !selectedAgent) {
     return (
       <div className="flex flex-col h-full">
         <div className="px-4 pt-4 pb-2 shrink-0">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-[18px] font-semibold text-primary-custom">AI Agents</h2>
+            <h2 className="text-[18px] font-bold text-primary-custom">AI Agents</h2>
             <button
               onClick={() => navigate("/create-agent")}
               className="flex items-center gap-1 bg-accent text-accent-foreground px-3 py-1.5 rounded-lg text-[11px] font-medium hover:opacity-90 active:scale-[0.97] transition-all"
@@ -124,35 +125,36 @@ export function ChatView() {
               </button>
             </div>
           ) : (
-            <div className="space-y-2.5 pt-2">
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
               {filteredAgents.map((agent) => (
                 <button
                   key={agent.id}
                   onClick={() => selectAgent(agent)}
-                  className="w-full bg-card border border-border rounded-2xl p-4 text-left hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group"
+                  className="bg-card border border-border rounded-2xl p-3 text-left hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group flex flex-col"
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+                  {/* Avatar */}
+                  <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center shrink-0 mb-2.5 overflow-hidden">
+                    {agent.avatar_url ? (
+                      <img src={agent.avatar_url} alt={agent.name} className="w-full h-full object-cover rounded-xl" />
+                    ) : (
                       <Bot size={20} className="text-accent" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="text-[14px] font-semibold text-primary-custom group-hover:text-accent transition-colors truncate">
-                          {agent.name}
-                        </h3>
-                        {agent.created_by === user?.id && (
-                          <span className="text-[9px] bg-accent/10 text-accent px-1.5 py-0.5 rounded-full font-medium shrink-0">yours</span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-secondary-custom mt-0.5 line-clamp-2">{agent.personality}</p>
-                      <div className="flex gap-1.5 mt-2 flex-wrap">
-                        {(agent.knowledge_areas || []).slice(0, 3).map((area) => (
-                          <span key={area} className="text-[10px] bg-background-secondary text-tertiary-custom px-2 py-0.5 rounded-full">
-                            {area}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <h3 className="text-[13px] font-semibold text-primary-custom group-hover:text-accent transition-colors truncate">
+                      {agent.name}
+                    </h3>
+                    {agent.created_by === user?.id && (
+                      <span className="text-[8px] bg-accent/10 text-accent px-1 py-0.5 rounded-full font-medium shrink-0">you</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-secondary-custom line-clamp-2 leading-relaxed">{agent.personality}</p>
+                  <div className="flex gap-1 mt-2 flex-wrap">
+                    {(agent.knowledge_areas || []).slice(0, 2).map((area) => (
+                      <span key={area} className="text-[9px] bg-background-secondary text-tertiary-custom px-1.5 py-0.5 rounded-full">
+                        {area}
+                      </span>
+                    ))}
                   </div>
                 </button>
               ))}
@@ -176,8 +178,12 @@ export function ChatView() {
             onClick={backToAgents}
             className="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-2 w-full active:scale-[0.98] transition-transform"
           >
-            <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-              <Bot size={14} className="text-accent" />
+            <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
+              {selectedAgent.avatar_url ? (
+                <img src={selectedAgent.avatar_url} alt="" className="w-full h-full object-cover rounded-lg" />
+              ) : (
+                <Bot size={14} className="text-accent" />
+              )}
             </div>
             <div className="flex-1 text-left min-w-0">
               <p className="text-[13px] font-medium text-primary-custom truncate">{selectedAgent.name}</p>
@@ -193,8 +199,12 @@ export function ChatView() {
         <div className="max-w-[720px] mx-auto px-3 py-4">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center min-h-[45vh] text-center px-4">
-              <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center mb-4">
-                <Bot size={24} className="text-accent" />
+              <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center mb-4 overflow-hidden">
+                {selectedAgent?.avatar_url ? (
+                  <img src={selectedAgent.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <Bot size={24} className="text-accent" />
+                )}
               </div>
               <h2 className="text-[17px] font-semibold text-primary-custom mb-1.5">
                 {selectedAgent?.name || "Discoverse AI"}
@@ -227,8 +237,12 @@ export function ChatView() {
                     </div>
                   ) : (
                     <div className="flex justify-start gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-accent/10 flex items-center justify-center shrink-0 mt-1">
-                        <Bot size={12} className="text-accent" />
+                      <div className="w-6 h-6 rounded-lg bg-accent/10 flex items-center justify-center shrink-0 mt-1 overflow-hidden">
+                        {selectedAgent?.avatar_url ? (
+                          <img src={selectedAgent.avatar_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <Bot size={12} className="text-accent" />
+                        )}
                       </div>
                       <div className="bg-card border border-border px-3.5 py-2.5 rounded-2xl rounded-bl-md max-w-[85%]">
                         <div className="prose prose-sm max-w-none text-[13px] text-primary-custom leading-relaxed prose-headings:text-primary-custom prose-strong:text-primary-custom prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">

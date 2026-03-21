@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/MainLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { User, Mail, Link2, Copy, Check, LogOut, Shield, Save, Bot, Trash2, Edit3, ExternalLink, BarChart3 } from "lucide-react";
+import { User, Mail, Link2, Copy, Check, LogOut, Shield, Save, Bot, Trash2, Edit3, ExternalLink, BarChart3, Power, Wrench, Eye, EyeOff, Users, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -17,6 +18,8 @@ export default function Profile() {
   const [stats, setStats] = useState({ simulations: 0, chats: 0 });
   const [myAgents, setMyAgents] = useState<any[]>([]);
   const [deletingAgent, setDeletingAgent] = useState<string | null>(null);
+  const [togglingAgent, setTogglingAgent] = useState<string | null>(null);
+  const [agentTab, setAgentTab] = useState<"active" | "drafts">("active");
 
   useEffect(() => {
     if (!user) return;
@@ -40,7 +43,7 @@ export default function Profile() {
   };
 
   const loadMyAgents = async () => {
-    const { data } = await supabase.from("ai_agents").select("id, name, slug, is_published, knowledge_areas, personality").eq("created_by", user!.id);
+    const { data } = await supabase.from("ai_agents").select("id, name, slug, is_published, knowledge_areas, personality, avatar_url").eq("created_by", user!.id);
     if (data) setMyAgents(data);
   };
 
@@ -48,7 +51,7 @@ export default function Profile() {
     if (!user) return;
     setSaving(true);
     const username = form.username.toLowerCase().replace(/[^a-z0-9_]/g, "");
-    const shareUrl = username ? `${window.location.origin}/u/${username}` : null;
+    const shareUrl = username ? `discoverseai.com/u/${username}` : null;
     const { error } = await supabase.from("profiles").update({
       display_name: form.display_name,
       username: username || null,
@@ -70,6 +73,17 @@ export default function Profile() {
     setCopied(true);
     toast.success("Link copied!");
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const toggleAgentPublish = async (agentId: string, currentStatus: boolean) => {
+    setTogglingAgent(agentId);
+    const { error } = await supabase.from("ai_agents").update({ is_published: !currentStatus }).eq("id", agentId).eq("created_by", user!.id);
+    if (error) toast.error("Failed to update");
+    else {
+      toast.success(!currentStatus ? "Agent published!" : "Agent unpublished");
+      loadMyAgents();
+    }
+    setTogglingAgent(null);
   };
 
   const deleteAgent = async (agentId: string) => {
@@ -95,12 +109,15 @@ export default function Profile() {
 
   const avatarUrl = user?.user_metadata?.avatar_url;
   const displayName = form.display_name || user?.email?.split("@")[0] || "Explorer";
+  const activeAgents = myAgents.filter(a => a.is_published);
+  const draftAgents = myAgents.filter(a => !a.is_published);
+  const shownAgents = agentTab === "active" ? activeAgents : draftAgents;
 
   return (
     <MainLayout title="Profile">
       <div className="p-5 md:p-8 overflow-y-auto h-full pb-20 md:pb-8 max-w-xl mx-auto">
         {/* Avatar & header */}
-        <div className="flex flex-col items-center text-center mb-8">
+        <div className="flex flex-col items-center text-center mb-6">
           {avatarUrl ? (
             <img src={avatarUrl} className="w-20 h-20 rounded-full object-cover border-2 border-border mb-3" alt="" />
           ) : (
@@ -108,7 +125,7 @@ export default function Profile() {
               <User size={32} strokeWidth={1.5} className="text-accent" />
             </div>
           )}
-          <h1 className="text-[20px] font-semibold text-primary-custom">{displayName}</h1>
+          <h1 className="text-[20px] font-bold text-primary-custom">{displayName}</h1>
           <p className="text-[13px] text-tertiary-custom">{user?.email}</p>
           <div className="flex gap-2 mt-2">
             {isAdmin && (
@@ -119,72 +136,120 @@ export default function Profile() {
                 <Shield size={10} /> Admin Panel
               </button>
             )}
+            {form.username && (
+              <button
+                onClick={() => copyLink(`discoverseai.com/u/${form.username}`)}
+                className="inline-flex items-center gap-1 text-[11px] bg-background-secondary text-secondary-custom px-2.5 py-1 rounded-full font-medium hover:bg-border transition-colors active:scale-[0.97]"
+              >
+                <Link2 size={10} /> Share Profile
+              </button>
+            )}
           </div>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-card border border-border rounded-xl p-3 text-center">
-            <p className="text-[20px] font-semibold text-primary-custom">{stats.simulations}</p>
+            <p className="text-[20px] font-bold text-primary-custom">{stats.simulations}</p>
             <p className="text-[10px] text-tertiary-custom mt-0.5">Simulations</p>
           </div>
           <div className="bg-card border border-border rounded-xl p-3 text-center">
-            <p className="text-[20px] font-semibold text-primary-custom">{myAgents.length}</p>
+            <p className="text-[20px] font-bold text-primary-custom">{myAgents.length}</p>
             <p className="text-[10px] text-tertiary-custom mt-0.5">My Agents</p>
           </div>
           <div className="bg-card border border-border rounded-xl p-3 text-center">
-            <p className="text-[20px] font-semibold text-primary-custom">{myAgents.filter(a => a.is_published).length}</p>
+            <p className="text-[20px] font-bold text-primary-custom">{activeAgents.length}</p>
             <p className="text-[10px] text-tertiary-custom mt-0.5">Published</p>
           </div>
         </div>
 
-        {/* My Agents */}
+        {/* My Agents - with tabs and controls */}
         {myAgents.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-[14px] font-semibold text-primary-custom mb-3">My Agents</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[14px] font-bold text-primary-custom">My Agents</h3>
+              <div className="flex rounded-full overflow-hidden border border-border h-7">
+                <button
+                  onClick={() => setAgentTab("active")}
+                  className={`px-3 text-[10px] font-medium transition-colors ${agentTab === "active" ? "bg-accent text-accent-foreground" : "text-secondary-custom"}`}
+                >
+                  Live ({activeAgents.length})
+                </button>
+                <button
+                  onClick={() => setAgentTab("drafts")}
+                  className={`px-3 text-[10px] font-medium transition-colors ${agentTab === "drafts" ? "bg-accent text-accent-foreground" : "text-secondary-custom"}`}
+                >
+                  Drafts ({draftAgents.length})
+                </button>
+              </div>
+            </div>
             <div className="space-y-2">
-              {myAgents.map(agent => (
-                <div key={agent.id} className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                    <Bot size={16} className="text-accent" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-[13px] font-medium text-primary-custom truncate">{agent.name}</p>
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${agent.is_published ? "bg-accent/10 text-accent" : "bg-background-secondary text-tertiary-custom"}`}>
-                        {agent.is_published ? "live" : "draft"}
-                      </span>
+              {shownAgents.map(agent => (
+                <div key={agent.id} className="bg-card border border-border rounded-xl p-3 animate-fade-in">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0 overflow-hidden">
+                      {agent.avatar_url ? (
+                        <img src={agent.avatar_url} alt="" className="w-full h-full object-cover rounded-lg" />
+                      ) : (
+                        <Bot size={16} className="text-accent" />
+                      )}
                     </div>
-                    <p className="text-[10px] text-tertiary-custom truncate">{agent.personality}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[13px] font-semibold text-primary-custom truncate">{agent.name}</p>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${agent.is_published ? "bg-green-500/10 text-green-600" : "bg-background-secondary text-tertiary-custom"}`}>
+                          {agent.is_published ? "live" : "draft"}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-tertiary-custom truncate">{agent.personality}</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {agent.is_published && (
+
+                  {/* Agent controls row */}
+                  <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-subtle">
+                    {/* Toggle on/off */}
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={agent.is_published}
+                        onCheckedChange={() => toggleAgentPublish(agent.id, agent.is_published)}
+                        disabled={togglingAgent === agent.id}
+                        className="scale-75"
+                      />
+                      <span className="text-[10px] text-tertiary-custom">{agent.is_published ? "Online" : "Offline"}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      {agent.is_published && (
+                        <button
+                          onClick={() => copyLink(`discoverseai.com/agent/${agent.slug}`)}
+                          className="p-1.5 hover:bg-background-secondary rounded-lg transition-colors"
+                          title="Copy share link"
+                        >
+                          <ExternalLink size={12} className="text-tertiary-custom" />
+                        </button>
+                      )}
                       <button
-                        onClick={() => copyLink(`${window.location.origin}/agent/${agent.slug}`)}
+                        onClick={() => navigate(`/create-agent?edit=${agent.id}`)}
                         className="p-1.5 hover:bg-background-secondary rounded-lg transition-colors"
-                        title="Copy share link"
+                        title="Edit"
                       >
-                        <ExternalLink size={12} className="text-tertiary-custom" />
+                        <Edit3 size={12} className="text-tertiary-custom" />
                       </button>
-                    )}
-                    <button
-                      onClick={() => navigate(`/create-agent?edit=${agent.id}`)}
-                      className="p-1.5 hover:bg-background-secondary rounded-lg transition-colors"
-                      title="Edit"
-                    >
-                      <Edit3 size={12} className="text-tertiary-custom" />
-                    </button>
-                    <button
-                      onClick={() => deleteAgent(agent.id)}
-                      disabled={deletingAgent === agent.id}
-                      className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 size={12} className={deletingAgent === agent.id ? "text-tertiary-custom animate-spin" : "text-destructive/60"} />
-                    </button>
+                      <button
+                        onClick={() => deleteAgent(agent.id)}
+                        disabled={deletingAgent === agent.id}
+                        className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 size={12} className={deletingAgent === agent.id ? "text-tertiary-custom animate-spin" : "text-destructive/60"} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
+              {shownAgents.length === 0 && (
+                <p className="text-[12px] text-tertiary-custom text-center py-4">No {agentTab === "active" ? "live" : "draft"} agents</p>
+              )}
             </div>
           </div>
         )}
@@ -219,9 +284,9 @@ export default function Profile() {
               <div className="flex items-center gap-2">
                 <div className="flex-1 bg-background-secondary border border-border rounded-xl h-10 px-3 flex items-center">
                   <Link2 size={13} className="text-tertiary-custom mr-2 shrink-0" />
-                  <span className="text-[12px] text-secondary-custom truncate">{window.location.origin}/u/{form.username}</span>
+                  <span className="text-[12px] text-secondary-custom truncate">discoverseai.com/u/{form.username}</span>
                 </div>
-                <button onClick={() => copyLink(`${window.location.origin}/u/${form.username}`)}
+                <button onClick={() => copyLink(`discoverseai.com/u/${form.username}`)}
                   className="w-10 h-10 bg-card border border-border rounded-xl flex items-center justify-center hover:bg-background-secondary transition-colors shrink-0">
                   {copied ? <Check size={14} className="text-accent" /> : <Copy size={14} className="text-tertiary-custom" />}
                 </button>
