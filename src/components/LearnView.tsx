@@ -107,6 +107,7 @@ const LOADING_MESSAGES = [
 ];
 
 export function LearnView() {
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [simulation, setSimulation] = useState<Simulation | null>(null);
