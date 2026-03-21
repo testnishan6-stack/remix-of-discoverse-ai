@@ -192,7 +192,18 @@ export function LearnView() {
 
     setLoadingProgress(30);
     if (model?.file_url) { setModelUrl(model.file_url); }
-    else { setModelUrl(null); }
+    else {
+      // No model in DB — generate an AI image as fallback visual
+      setModelUrl(null);
+      try {
+        const { data: imgData, error: imgErr } = await supabase.functions.invoke("generate-model-image", {
+          body: { topic: t },
+        });
+        if (!imgErr && imgData?.imageUrl) {
+          setModelUrl(imgData.imageUrl);
+        }
+      } catch { /* continue without image */ }
+    }
 
     let effectiveNamedParts: string[] = model?.named_parts?.length ? model.named_parts : [];
     if (!effectiveNamedParts.length && model?.file_url?.toLowerCase().endsWith(".glb")) {
@@ -318,7 +329,13 @@ export function LearnView() {
           </div>
         ) : simulation ? (
           <>
-            <ModelViewer modelUrl={modelUrl} highlightPart={resolvedHighlightPart} highlightColor={step?.color} onPartsLoaded={onPartsLoaded} />
+            {modelUrl?.startsWith("data:image") ? (
+              <div className="h-full flex items-center justify-center p-4 bg-gradient-to-b from-canvas to-background">
+                <img src={modelUrl} alt={simulation.title} className="max-w-full max-h-full object-contain rounded-xl shadow-lg" />
+              </div>
+            ) : (
+              <ModelViewer modelUrl={modelUrl} highlightPart={resolvedHighlightPart} highlightColor={step?.color} onPartsLoaded={onPartsLoaded} />
+            )}
 
             {/* Step indicator pill */}
             <div className="absolute top-2.5 left-2.5 bg-card/90 backdrop-blur-sm border border-border rounded-full px-2.5 py-1 flex items-center gap-1.5">

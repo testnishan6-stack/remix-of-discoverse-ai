@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/MainLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { User, Mail, Link2, Copy, Check, LogOut, Shield, Save, Bot, Trash2, Edit3, ExternalLink, BarChart3, Power, Wrench, Eye, EyeOff, Users, MessageSquare } from "lucide-react";
+import { User, Mail, Link2, Copy, Check, LogOut, Shield, Save, Bot, Trash2, Edit3, ExternalLink, Power } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 
@@ -48,28 +48,30 @@ export default function Profile() {
   };
 
   const saveProfile = async () => {
-    if (!user) return;
+    if (!user || !profile) return;
     setSaving(true);
     const username = form.username.toLowerCase().replace(/[^a-z0-9_]/g, "");
     const shareUrl = username ? `discoverseai.com/u/${username}` : null;
+    
     const { error } = await supabase.from("profiles").update({
-      display_name: form.display_name,
+      display_name: form.display_name || null,
       username: username || null,
       bio: form.bio || null,
       share_url: shareUrl,
-    }).eq("user_id", user.id);
+    }).eq("id", profile.id);
+    
     if (error) {
       if (error.code === "23505") toast.error("Username already taken");
-      else toast.error("Failed to save");
+      else toast.error("Failed to save: " + error.message);
     } else {
       toast.success("Profile updated!");
-      loadProfile();
+      await loadProfile();
     }
     setSaving(false);
   };
 
   const copyLink = (url: string) => {
-    navigator.clipboard.writeText(url);
+    navigator.clipboard.writeText(`https://${url}`);
     setCopied(true);
     toast.success("Link copied!");
     setTimeout(() => setCopied(false), 2000);
@@ -87,6 +89,7 @@ export default function Profile() {
   };
 
   const deleteAgent = async (agentId: string) => {
+    if (!confirm("Delete this agent permanently?")) return;
     setDeletingAgent(agentId);
     const { error } = await supabase.from("ai_agents").delete().eq("id", agentId).eq("created_by", user!.id);
     if (error) toast.error("Failed to delete");
@@ -129,18 +132,14 @@ export default function Profile() {
           <p className="text-[13px] text-tertiary-custom">{user?.email}</p>
           <div className="flex gap-2 mt-2">
             {isAdmin && (
-              <button
-                onClick={() => navigate("/admin")}
-                className="inline-flex items-center gap-1 text-[11px] bg-accent/10 text-accent px-2.5 py-1 rounded-full font-medium hover:bg-accent/20 transition-colors active:scale-[0.97]"
-              >
+              <button onClick={() => navigate("/admin")}
+                className="inline-flex items-center gap-1 text-[11px] bg-accent/10 text-accent px-2.5 py-1 rounded-full font-medium hover:bg-accent/20 transition-colors active:scale-[0.97]">
                 <Shield size={10} /> Admin Panel
               </button>
             )}
             {form.username && (
-              <button
-                onClick={() => copyLink(`discoverseai.com/u/${form.username}`)}
-                className="inline-flex items-center gap-1 text-[11px] bg-background-secondary text-secondary-custom px-2.5 py-1 rounded-full font-medium hover:bg-border transition-colors active:scale-[0.97]"
-              >
+              <button onClick={() => copyLink(`discoverseai.com/u/${form.username}`)}
+                className="inline-flex items-center gap-1 text-[11px] bg-background-secondary text-secondary-custom px-2.5 py-1 rounded-full font-medium hover:bg-border transition-colors active:scale-[0.97]">
                 <Link2 size={10} /> Share Profile
               </button>
             )}
@@ -163,22 +162,18 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* My Agents - with tabs and controls */}
+        {/* My Agents */}
         {myAgents.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[14px] font-bold text-primary-custom">My Agents</h3>
               <div className="flex rounded-full overflow-hidden border border-border h-7">
-                <button
-                  onClick={() => setAgentTab("active")}
-                  className={`px-3 text-[10px] font-medium transition-colors ${agentTab === "active" ? "bg-accent text-accent-foreground" : "text-secondary-custom"}`}
-                >
+                <button onClick={() => setAgentTab("active")}
+                  className={`px-3 text-[10px] font-medium transition-colors ${agentTab === "active" ? "bg-accent text-accent-foreground" : "text-secondary-custom"}`}>
                   Live ({activeAgents.length})
                 </button>
-                <button
-                  onClick={() => setAgentTab("drafts")}
-                  className={`px-3 text-[10px] font-medium transition-colors ${agentTab === "drafts" ? "bg-accent text-accent-foreground" : "text-secondary-custom"}`}
-                >
+                <button onClick={() => setAgentTab("drafts")}
+                  className={`px-3 text-[10px] font-medium transition-colors ${agentTab === "drafts" ? "bg-accent text-accent-foreground" : "text-secondary-custom"}`}>
                   Drafts ({draftAgents.length})
                 </button>
               </div>
@@ -204,43 +199,25 @@ export default function Profile() {
                       <p className="text-[10px] text-tertiary-custom truncate">{agent.personality}</p>
                     </div>
                   </div>
-
-                  {/* Agent controls row */}
                   <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-subtle">
-                    {/* Toggle on/off */}
                     <div className="flex items-center gap-2">
-                      <Switch
-                        checked={agent.is_published}
-                        onCheckedChange={() => toggleAgentPublish(agent.id, agent.is_published)}
-                        disabled={togglingAgent === agent.id}
-                        className="scale-75"
-                      />
+                      <Switch checked={agent.is_published} onCheckedChange={() => toggleAgentPublish(agent.id, agent.is_published)}
+                        disabled={togglingAgent === agent.id} className="scale-75" />
                       <span className="text-[10px] text-tertiary-custom">{agent.is_published ? "Online" : "Offline"}</span>
                     </div>
-
                     <div className="flex items-center gap-1">
                       {agent.is_published && (
-                        <button
-                          onClick={() => copyLink(`discoverseai.com/agent/${agent.slug}`)}
-                          className="p-1.5 hover:bg-background-secondary rounded-lg transition-colors"
-                          title="Copy share link"
-                        >
+                        <button onClick={() => copyLink(`discoverseai.com/agent/${agent.slug}`)}
+                          className="p-1.5 hover:bg-background-secondary rounded-lg transition-colors" title="Copy share link">
                           <ExternalLink size={12} className="text-tertiary-custom" />
                         </button>
                       )}
-                      <button
-                        onClick={() => navigate(`/create-agent?edit=${agent.id}`)}
-                        className="p-1.5 hover:bg-background-secondary rounded-lg transition-colors"
-                        title="Edit"
-                      >
+                      <button onClick={() => navigate(`/create-agent?edit=${agent.id}`)}
+                        className="p-1.5 hover:bg-background-secondary rounded-lg transition-colors" title="Edit">
                         <Edit3 size={12} className="text-tertiary-custom" />
                       </button>
-                      <button
-                        onClick={() => deleteAgent(agent.id)}
-                        disabled={deletingAgent === agent.id}
-                        className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors"
-                        title="Delete"
-                      >
+                      <button onClick={() => deleteAgent(agent.id)} disabled={deletingAgent === agent.id}
+                        className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors" title="Delete">
                         <Trash2 size={12} className={deletingAgent === agent.id ? "text-tertiary-custom animate-spin" : "text-destructive/60"} />
                       </button>
                     </div>

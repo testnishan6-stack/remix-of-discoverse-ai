@@ -21,6 +21,8 @@ export type Database = {
           created_by: string | null
           greeting_message: string
           id: string
+          image_gen_style: string | null
+          is_maintenance: boolean | null
           is_published: boolean
           knowledge_areas: string[] | null
           language_style: string
@@ -29,6 +31,7 @@ export type Database = {
           research_papers: string[] | null
           slug: string
           system_prompt: string
+          tools_enabled: Json | null
           updated_at: string
           voice_id: string | null
         }
@@ -38,6 +41,8 @@ export type Database = {
           created_by?: string | null
           greeting_message?: string
           id?: string
+          image_gen_style?: string | null
+          is_maintenance?: boolean | null
           is_published?: boolean
           knowledge_areas?: string[] | null
           language_style?: string
@@ -46,6 +51,7 @@ export type Database = {
           research_papers?: string[] | null
           slug: string
           system_prompt: string
+          tools_enabled?: Json | null
           updated_at?: string
           voice_id?: string | null
         }
@@ -55,6 +61,8 @@ export type Database = {
           created_by?: string | null
           greeting_message?: string
           id?: string
+          image_gen_style?: string | null
+          is_maintenance?: boolean | null
           is_published?: boolean
           knowledge_areas?: string[] | null
           language_style?: string
@@ -63,6 +71,7 @@ export type Database = {
           research_papers?: string[] | null
           slug?: string
           system_prompt?: string
+          tools_enabled?: Json | null
           updated_at?: string
           voice_id?: string | null
         }
