@@ -28,7 +28,7 @@ export function ChatView() {
   const [searchQuery, setSearchQuery] = useState("");
   const { language } = useApp();
   const { user } = useAuth();
-  const { messages, isLoading, send, clear } = useStreamChat();
+  const { messages, isLoading, send, clear, pastConversations, loadConversations, resumeConversation } = useStreamChat();
   const { speak, stop: stopTTS, isSpeaking } = useTTS();
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
