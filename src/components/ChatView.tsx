@@ -213,6 +213,29 @@ export function ChatView() {
               <p className="text-[13px] text-secondary-custom leading-relaxed max-w-sm mb-6">
                 {greeting}
               </p>
+
+              {/* Past conversations */}
+              {pastConversations.length > 0 && (
+                <div className="w-full max-w-sm mb-4">
+                  <p className="text-[11px] text-tertiary-custom mb-2 text-left font-medium">Recent chats</p>
+                  <div className="space-y-1.5">
+                    {pastConversations.slice(0, 3).map((conv) => (
+                      <button
+                        key={conv.id}
+                        onClick={() => resumeConversation(conv)}
+                        className="w-full flex items-center gap-2 px-3 py-2 bg-card border border-border rounded-xl text-left hover:border-accent transition-all active:scale-[0.97]"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] text-primary-custom truncate">{conv.title || "Chat"}</p>
+                          <p className="text-[10px] text-tertiary-custom">{new Date(conv.updated_at).toLocaleDateString()}</p>
+                        </div>
+                        <ChevronDown size={12} className="text-tertiary-custom -rotate-90 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 gap-2 w-full max-w-sm">
                 {["Explain photosynthesis", "DNA structure k ho?", "Solar System bare batau", "Quantum physics basics"].map((q) => (
                   <button
