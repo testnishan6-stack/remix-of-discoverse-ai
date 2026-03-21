@@ -11,6 +11,7 @@ import Library from "./pages/Library";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
+import CreateAgent from "./pages/CreateAgent";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
