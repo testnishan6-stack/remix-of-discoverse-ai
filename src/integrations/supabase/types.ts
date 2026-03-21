@@ -77,6 +77,44 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_history: {
+        Row: {
+          agent_id: string
+          created_at: string
+          id: string
+          messages: Json
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          id?: string
+          messages?: Json
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          id?: string
+          messages?: Json
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_history_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       models: {
         Row: {
           class_levels: number[] | null
