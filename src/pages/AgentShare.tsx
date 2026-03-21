@@ -78,6 +78,9 @@ export default function AgentShare() {
         <Logo size={20} />
       </header>
 
+      {/* SEO-friendly deep link notice */}
+      {/* Share URL: discoverseai.com/agent/{slug} */}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[720px] mx-auto px-4 py-4">

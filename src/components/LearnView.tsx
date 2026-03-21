@@ -96,6 +96,15 @@ const normalizeSimulationData = (rawSimulation: unknown, availableParts: string[
   };
 };
 
+/* ── Premium loading messages ── */
+const LOADING_MESSAGES = [
+  "🔬 Scanning knowledge base...",
+  "🧠 AI is thinking deeply...",
+  "⚡ Generating simulation steps...",
+  "🎨 Preparing 3D visualization...",
+  "✨ Almost ready, finalizing...",
+];
+
 export function LearnView() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
@@ -111,9 +120,22 @@ export function LearnView() {
   const { language, setLanguage } = useApp();
   const { speak, stop: stopTTS, isSpeaking } = useTTS();
   const autoPlayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadingMsgRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const step = simulation?.steps[currentStep];
   const resolvedHighlightPart = step ? resolvePartName(step.part, modelParts) || undefined : undefined;
+
+  // Animated loading messages
+  useEffect(() => {
+    if (isLoading) {
+      let idx = 0;
+      loadingMsgRef.current = setInterval(() => {
+        idx = (idx + 1) % LOADING_MESSAGES.length;
+        setLoadingMsg(LOADING_MESSAGES[idx]);
+      }, 2500);
+      return () => { if (loadingMsgRef.current) clearInterval(loadingMsgRef.current); };
+    }
+  }, [isLoading]);
 
   // Auto-play logic
   useEffect(() => {
@@ -157,7 +179,7 @@ export function LearnView() {
     setSimulation(null);
     setModelParts([]);
     setLoadingProgress(10);
-    setLoadingMsg("Finding 3D model...");
+    setLoadingMsg(LOADING_MESSAGES[0]);
     setShowPanel(true);
 
     const slug = t.toLowerCase().replace(/\s+/g, "_");
@@ -169,13 +191,12 @@ export function LearnView() {
       .limit(1).maybeSingle();
 
     setLoadingProgress(30);
-    if (model?.file_url) { setModelUrl(model.file_url); setLoadingMsg("Model found! Creating simulation..."); }
-    else { setModelUrl(null); setLoadingMsg("No model. Creating AI simulation..."); }
+    if (model?.file_url) { setModelUrl(model.file_url); }
+    else { setModelUrl(null); }
 
     let effectiveNamedParts: string[] = model?.named_parts?.length ? model.named_parts : [];
     if (!effectiveNamedParts.length && model?.file_url?.toLowerCase().endsWith(".glb")) {
       setLoadingProgress(45);
-      setLoadingMsg("Analyzing model parts...");
       const extracted = await extractModelPartsFromGlb(model.file_url);
       if (extracted.length > 0) { effectiveNamedParts = extracted; setModelParts(extracted); }
     }
@@ -190,7 +211,6 @@ export function LearnView() {
           rawCached.steps.some((s) => { const p = typeof s?.part === "string" ? s.part : ""; return p.trim().length > 0 && !resolvePartName(p, effectiveNamedParts); });
         if (!cacheHasUnresolvedParts) {
           setLoadingProgress(90);
-          setLoadingMsg("Loading cached simulation...");
           setSimulation(normalizeSimulationData(cached.ai_response, effectiveNamedParts, t));
           setCurrentStep(0);
           setLoadingProgress(100);
@@ -201,7 +221,6 @@ export function LearnView() {
       }
     }
 
-    setLoadingMsg("AI is creating your simulation...");
     setLoadingProgress(65);
     try {
       const { data, error } = await supabase.functions.invoke("enhance-model", {
@@ -209,7 +228,6 @@ export function LearnView() {
       });
       if (error) throw error;
       setLoadingProgress(85);
-      setLoadingMsg("Finalizing...");
       if (data && data.steps) {
         const normalized = normalizeSimulationData(data, effectiveNamedParts, t);
         setSimulation(normalized);
@@ -284,12 +302,19 @@ export function LearnView() {
       {/* 3D Canvas */}
       <div className="flex-1 mx-3 mb-1 bg-canvas rounded-2xl border border-subtle overflow-hidden relative min-h-0">
         {isLoading ? (
-          <div className="h-full flex flex-col items-center justify-center gap-3 px-6">
-            <div className="w-full max-w-[200px]">
-              <Progress value={loadingProgress} className="h-1" />
+          <div className="h-full flex flex-col items-center justify-center gap-4 px-6 bg-gradient-to-b from-canvas to-background">
+            {/* Premium loading animation */}
+            <div className="relative">
+              <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center">
+                <Atom size={32} strokeWidth={1} className="text-accent" style={{ animation: "spin 3s linear infinite" }} />
+              </div>
+              <div className="absolute -inset-3 rounded-2xl border border-accent/20" style={{ animation: "pulse-dot 2s ease-in-out infinite" }} />
             </div>
-            <Atom size={36} strokeWidth={1} className="text-accent animate-spin" style={{ animationDuration: "3s" }} />
-            <p className="text-[13px] text-primary-custom font-medium text-center">{loadingMsg}</p>
+            <div className="w-full max-w-[200px]">
+              <Progress value={loadingProgress} className="h-1.5" />
+            </div>
+            <p className="text-[13px] text-primary-custom font-medium text-center animate-fade-in">{loadingMsg}</p>
+            <p className="text-[10px] text-tertiary-custom">This usually takes 5-10 seconds</p>
           </div>
         ) : simulation ? (
           <>
