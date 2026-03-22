@@ -70,11 +70,11 @@ const normalizeSimulationData = (rawSimulation: unknown, availableParts: string[
     const step = rawStep as Partial<SimStep>;
     const rawPart = typeof step.part === "string" ? step.part.trim() : "";
     return {
-      title: typeof step.title === "string" && step.title.trim() ? step.title.trim() : `Step ${index + 1}`,
+    title: typeof step.title === "string" && step.title.trim() ? step.title.trim() : `Step ${index + 1}`,
       part: availableParts.length > 0 ? resolvePartName(rawPart, availableParts) : rawPart,
       color: isHexColor(step.color) ? step.color : fallbackStepColors[index % fallbackStepColors.length],
       narration_en: typeof step.narration_en === "string" && step.narration_en.trim() ? step.narration_en.trim() : `Let's explore ${topicLabel}.`,
-      narration_hi: typeof step.narration_hi === "string" && step.narration_hi.trim() ? step.narration_hi.trim() : `${topicLabel} ko samjhte hain.`,
+      narration_hi: typeof step.narration_hi === "string" && step.narration_hi.trim() ? step.narration_hi.trim() : `${topicLabel} ko samajhte hain.`,
       label_en: typeof step.label_en === "string" && step.label_en.trim() ? step.label_en.trim() : topicLabel,
       label_hi: typeof step.label_hi === "string" && step.label_hi.trim() ? step.label_hi.trim() : topicLabel,
       camera: step.camera && typeof step.camera.x === "number" && typeof step.camera.y === "number" && typeof step.camera.z === "number"
@@ -87,9 +87,9 @@ const normalizeSimulationData = (rawSimulation: unknown, availableParts: string[
   return {
     title: topicLabel,
     steps: [
-      { title: topicLabel, part: "", color: fallbackStepColors[0], narration_en: `This is ${topicLabel}. Tap play to hear each part explained.`, narration_hi: `Yo ${topicLabel} ho. Sunna play garnus.`, label_en: topicLabel, label_hi: topicLabel, camera: { x: 0, y: 0, z: 4 } },
-      { title: "Key Parts", part: "", color: fallbackStepColors[1], narration_en: `${topicLabel} has several key components.`, narration_hi: `${topicLabel} ma kehi important bhag chan.`, label_en: "Parts", label_hi: "भाग", camera: { x: 2, y: 1, z: 3 } },
-      { title: "Summary", part: "", color: fallbackStepColors[2], narration_en: `That's ${topicLabel}. Quick and clear.`, narration_hi: `Yo thiyo ${topicLabel}. Simple ra clear.`, label_en: "Summary", label_hi: "सारांश", camera: { x: 0, y: 0, z: 4 } },
+      { title: topicLabel, part: "", color: fallbackStepColors[0], narration_en: `This is ${topicLabel}. Tap play to hear each part explained.`, narration_hi: `Yeh ${topicLabel} hai. Sunne ke liye play dabayein.`, label_en: topicLabel, label_hi: topicLabel, camera: { x: 0, y: 0, z: 4 } },
+      { title: "Key Parts", part: "", color: fallbackStepColors[1], narration_en: `${topicLabel} has several key components.`, narration_hi: `${topicLabel} mein kai important hisse hain.`, label_en: "Parts", label_hi: "भाग", camera: { x: 2, y: 1, z: 3 } },
+      { title: "Summary", part: "", color: fallbackStepColors[2], narration_en: `That's ${topicLabel}. Quick and clear.`, narration_hi: `Yeh tha ${topicLabel}. Simple aur clear.`, label_en: "Summary", label_hi: "सारांश", camera: { x: 0, y: 0, z: 4 } },
     ],
   };
 };
@@ -269,9 +269,27 @@ export function LearnView() {
         });
         if (!genErr && Array.isArray(genData) && genData.length > 0) {
           setProceduralModel(genData as ProceduralPrimitive[]);
-          // Extract part names from generated model
           const genParts = genData.map((p: any) => p.name).filter(Boolean);
           setModelParts(genParts);
+
+          // Save AI-generated model to DB so it appears in library
+          if (user) {
+            const aiSlug = `ai-${slug}-${Date.now()}`;
+            const { data: newModel } = await supabase.from("models").insert({
+              name: t,
+              slug: aiSlug,
+              subject: "science",
+              file_url: `procedural://${aiSlug}`,
+              file_format: "procedural",
+              status: "published",
+              named_parts: genParts,
+              uploaded_by: user.id,
+              keywords_en: words,
+            }).select("id").single();
+            if (newModel) {
+              model = { ...newModel, named_parts: genParts, file_url: `procedural://${aiSlug}`, subject: "science" };
+            }
+          }
         }
       } catch (e) {
         console.error("Procedural model generation failed:", e);
@@ -522,7 +540,7 @@ export function LearnView() {
                     language === l ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-secondary"
                   }`}
                 >
-                  {l === "en" ? "EN" : "ने"}
+                  {l === "en" ? "EN" : "हि"}
                 </button>
               ))}
             </div>

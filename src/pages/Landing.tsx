@@ -10,7 +10,7 @@ import {
   ChevronRight, Users, TrendingUp, Award, Check, X, Mail,
   Shield, Handshake, FileText, MessageSquare, Menu, ExternalLink,
   Star, Rocket, Eye, Play, Cpu, Lock, Crown, Phone, DollarSign,
-  Briefcase, Scale, AlertTriangle, UserPlus, Heart, Send,
+  Briefcase, Scale, AlertTriangle, UserPlus, Heart, Send, Share2,
 } from "lucide-react";
 
 /* ── Reveal hook ── */
@@ -691,6 +691,41 @@ export default function Landing() {
             </div>
           </Reveal>
         </div>
+      </section>
+
+      {/* ═══ LAUNCH OFFER ═══ */}
+      <section className="py-16 px-5 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-accent/10 via-purple-500/10 to-accent/10" />
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "radial-gradient(circle, hsl(var(--foreground)) 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
+        <Reveal className="max-w-3xl mx-auto relative z-10">
+          <div className="glass-card rounded-3xl p-8 md:p-10 text-center border-2 border-accent/20 shadow-2xl shadow-accent/10">
+            <div className="inline-flex items-center gap-2 bg-accent/15 border border-accent/25 rounded-full px-4 py-1.5 mb-5">
+              <Rocket size={13} className="text-accent" />
+              <span className="text-[11px] font-black text-accent uppercase tracking-wider">🚀 Launch Offer</span>
+            </div>
+            <h2 className="text-[clamp(1.5rem,5vw,2.4rem)] font-black text-foreground mb-3 leading-tight">
+              Invite Friends, Get <span className="gradient-text">1 Month Free Pro!</span>
+            </h2>
+            <p className="text-[15px] text-muted-foreground mb-6 leading-relaxed max-w-lg mx-auto">
+              Share Discoverse with your friends. When they sign up, <span className="text-foreground font-semibold">you both get 1 month of Pro for free</span>. No limits, no catches.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
+              <button onClick={() => { navigator.clipboard.writeText("https://discoverseai.com?ref=launch"); toast.success("Referral link copied!"); }}
+                className="w-full sm:w-auto bg-accent text-accent-foreground text-[15px] font-bold px-8 py-4 rounded-2xl hover:opacity-90 active:scale-[0.97] transition-all flex items-center justify-center gap-2 shadow-xl shadow-accent/25" style={{ animation: "pulse-glow 3s ease-in-out infinite" }}>
+                <Share2 size={16} /> Copy Invite Link
+              </button>
+              <button onClick={() => { const text = "Check out Discoverse — AI-powered 3D learning with voice narration! 🚀 Sign up and we both get 1 month Pro free: https://discoverseai.com?ref=launch"; if (navigator.share) { navigator.share({ title: "Discoverse", text }); } else { navigator.clipboard.writeText(text); toast.success("Share text copied!"); } }}
+                className="w-full sm:w-auto glass-card text-[14px] font-semibold text-foreground px-7 py-4 rounded-2xl hover:bg-card active:scale-[0.97] transition-all flex items-center justify-center gap-2">
+                <ExternalLink size={14} className="text-accent" /> Share via...
+              </button>
+            </div>
+            <div className="flex items-center justify-center gap-6 text-[12px] text-muted-foreground">
+              <span className="flex items-center gap-1.5"><Check size={13} className="text-accent" /> Unlimited AI chats</span>
+              <span className="flex items-center gap-1.5"><Check size={13} className="text-accent" /> All 3D models</span>
+              <span className="flex items-center gap-1.5"><Check size={13} className="text-accent" /> Voice narration</span>
+            </div>
+          </div>
+        </Reveal>
       </section>
 
       {/* ═══ CTA ═══ */}
