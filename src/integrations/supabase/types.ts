@@ -280,6 +280,33 @@ export type Database = {
         }
         Relationships: []
       }
+      phone_otps: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          otp_code: string
+          phone: string
+          verified: boolean
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          otp_code: string
+          phone: string
+          verified?: boolean
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          otp_code?: string
+          phone?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
       platform_settings: {
         Row: {
           key: string
@@ -306,8 +333,10 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           created_at: string
+          date_of_birth: string | null
           display_name: string | null
           id: string
+          phone: string | null
           role_default: string | null
           share_url: string | null
           updated_at: string
@@ -318,8 +347,10 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          date_of_birth?: string | null
           display_name?: string | null
           id?: string
+          phone?: string | null
           role_default?: string | null
           share_url?: string | null
           updated_at?: string
@@ -330,8 +361,10 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          date_of_birth?: string | null
           display_name?: string | null
           id?: string
+          phone?: string | null
           role_default?: string | null
           share_url?: string | null
           updated_at?: string
