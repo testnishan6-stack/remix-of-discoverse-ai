@@ -144,7 +144,9 @@ export function LearnView() {
   const [showPanel, setShowPanel] = useState(true);
   const { language, setLanguage } = useApp();
   const { speak, stop: stopTTS, isSpeaking } = useTTS();
+  const { canGenerateModel, modelsRemaining, incrementModelGen } = useUsageLimits();
   const autoPlayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadingMsgRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const loadingMsgRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const step = simulation?.steps[currentStep];
