@@ -70,11 +70,11 @@ const normalizeSimulationData = (rawSimulation: unknown, availableParts: string[
     const step = rawStep as Partial<SimStep>;
     const rawPart = typeof step.part === "string" ? step.part.trim() : "";
     return {
-      title: typeof step.title === "string" && step.title.trim() ? step.title.trim() : `Step ${index + 1}`,
+    title: typeof step.title === "string" && step.title.trim() ? step.title.trim() : `Step ${index + 1}`,
       part: availableParts.length > 0 ? resolvePartName(rawPart, availableParts) : rawPart,
       color: isHexColor(step.color) ? step.color : fallbackStepColors[index % fallbackStepColors.length],
       narration_en: typeof step.narration_en === "string" && step.narration_en.trim() ? step.narration_en.trim() : `Let's explore ${topicLabel}.`,
-      narration_hi: typeof step.narration_hi === "string" && step.narration_hi.trim() ? step.narration_hi.trim() : `${topicLabel} ko samjhte hain.`,
+      narration_hi: typeof step.narration_hi === "string" && step.narration_hi.trim() ? step.narration_hi.trim() : `${topicLabel} ko samajhte hain.`,
       label_en: typeof step.label_en === "string" && step.label_en.trim() ? step.label_en.trim() : topicLabel,
       label_hi: typeof step.label_hi === "string" && step.label_hi.trim() ? step.label_hi.trim() : topicLabel,
       camera: step.camera && typeof step.camera.x === "number" && typeof step.camera.y === "number" && typeof step.camera.z === "number"
