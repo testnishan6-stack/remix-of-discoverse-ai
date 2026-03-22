@@ -181,7 +181,7 @@ export default function Profile() {
               </button>
             )}
             {form.username && (
-              <button onClick={() => copyLink(`discoverseai.com/u/${form.username}`)}
+              <button onClick={() => copyLink(`/u/${form.username}`)}
                 className="inline-flex items-center gap-1 text-[11px] bg-background-secondary text-secondary-custom px-2.5 py-1 rounded-full font-medium hover:bg-border transition-colors active:scale-[0.97]">
                 <Link2 size={10} /> Share Profile
               </button>
