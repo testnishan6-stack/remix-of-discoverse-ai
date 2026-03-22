@@ -50,13 +50,11 @@ serve(async (req) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error("ElevenLabs error:", response.status, errText);
-      if (response.status === 401) throw new Error("ElevenLabs API key is invalid");
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Voice generation rate limited." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`ElevenLabs API error: ${response.status}`);
+      // Return 503 for auth/rate issues so client falls back to browser TTS silently
+      const clientStatus = response.status === 401 || response.status === 403 ? 503 : response.status === 429 ? 429 : 502;
+      return new Response(JSON.stringify({ error: "Voice temporarily unavailable", fallback: true }), {
+        status: clientStatus, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const audioBuffer = await response.arrayBuffer();
