@@ -9,9 +9,12 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { ModelViewer, type ProceduralPrimitive } from "./ModelViewer";
 import { useApp } from "@/contexts/AppContext";
 import { useTTS } from "@/hooks/useTTS";
+import { useUsageLimits } from "@/hooks/useUsageLimits";
+import { UsageLimitBanner, UsageCounter } from "@/components/UsageLimitBanner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
 
 interface SimStep {
   title: string;
@@ -141,6 +144,7 @@ export function LearnView() {
   const [showPanel, setShowPanel] = useState(true);
   const { language, setLanguage } = useApp();
   const { speak, stop: stopTTS, isSpeaking } = useTTS();
+  const { canGenerateModel, modelsRemaining, incrementModelGen } = useUsageLimits();
   const autoPlayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingMsgRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -188,6 +192,15 @@ export function LearnView() {
   const handleGenerate = async (topic?: string) => {
     const t = topic || topicInput;
     if (!t.trim()) return;
+    if (!canGenerateModel) {
+      toast.error("Daily 3D generation limit reached! Upgrade to Pro for unlimited access.");
+      return;
+    }
+    const ok = await incrementModelGen();
+    if (!ok) {
+      toast.error("Daily limit reached!");
+      return;
+    }
     setTopicInput(t);
     setIsLoading(true);
     setSimulation(null);
@@ -391,13 +404,19 @@ export function LearnView() {
         </div>
         <button
           onClick={() => handleGenerate()}
-          disabled={isLoading || !topicInput.trim()}
+          disabled={isLoading || !topicInput.trim() || !canGenerateModel}
           className="bg-accent text-accent-foreground px-4 rounded-xl text-[13px] font-medium hover:opacity-90 transition-opacity active:scale-[0.97] disabled:opacity-40 flex items-center gap-1.5 shrink-0"
         >
           {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
           <span className="hidden sm:inline">Generate</span>
         </button>
       </div>
+
+      <div className="px-3 flex items-center justify-between">
+        <UsageCounter remaining={modelsRemaining} total={3} type="model" />
+      </div>
+
+      <UsageLimitBanner type="model" remaining={modelsRemaining} total={3} />
 
       {/* Topic chips */}
       <div className="px-3 flex gap-1.5 overflow-x-auto pb-2 scrollbar-none shrink-0">

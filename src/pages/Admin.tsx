@@ -3,17 +3,24 @@ import { MainLayout } from "@/components/MainLayout";
 import {
   Database, Upload, BarChart3, Layers, Plus, X, CloudUpload, Check,
   AlertTriangle, Bot, Sparkles, Eye, EyeOff, Save, Trash2, ChevronRight,
+  Users, Mail, Shield, Activity, Settings, Power, Key, RefreshCw,
+  CheckCircle, XCircle, Clock, Crown,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const adminNav = [
-  { icon: Database, label: "Models", path: "/admin" },
+  { icon: Activity, label: "Health", path: "/admin/health" },
+  { icon: Users, label: "Users", path: "/admin/users" },
+  { icon: Mail, label: "Contacts", path: "/admin/contacts" },
   { icon: Bot, label: "AI Agents", path: "/admin/agents" },
+  { icon: Database, label: "Models", path: "/admin" },
   { icon: Upload, label: "Upload", path: "/admin/upload" },
   { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
   { icon: Layers, label: "Cache", path: "/admin/cache" },
+  { icon: Settings, label: "Settings", path: "/admin/settings" },
 ];
 
 const subjectColors: Record<string, string> = {
@@ -24,6 +31,18 @@ const subjectColors: Record<string, string> = {
   engineering: "bg-orange-50 text-orange-700",
   mathematics: "bg-pink-50 text-pink-700",
 };
+
+function getView(path: string) {
+  if (path.includes("/health")) return "health";
+  if (path.includes("/users")) return "users";
+  if (path.includes("/contacts")) return "contacts";
+  if (path.includes("/agents")) return "agents";
+  if (path.includes("/upload")) return "upload";
+  if (path.includes("/analytics")) return "analytics";
+  if (path.includes("/cache")) return "cache";
+  if (path.includes("/settings")) return "settings";
+  return "models";
+}
 
 export default function Admin() {
   const { isAdmin } = useAuth();
@@ -42,20 +61,20 @@ export default function Admin() {
     );
   }
 
-  const currentView = location.pathname.includes("/agents") ? "agents" : location.pathname.includes("/upload") ? "upload" : "models";
+  const currentView = getView(location.pathname);
 
   return (
     <MainLayout title="Admin Panel">
       <div className="flex h-full">
-        {/* Sidebar nav - hidden on mobile, shown as top tabs on mobile */}
-        <div className="hidden md:block w-44 bg-background-secondary border-r border-border p-2.5 space-y-0.5 shrink-0">
+        <div className="hidden md:block w-44 bg-background-secondary border-r border-border p-2.5 space-y-0.5 shrink-0 overflow-y-auto">
           <p className="label-text text-tertiary-custom px-3 py-2">Admin</p>
           {adminNav.map((item) => (
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 ${
-                location.pathname === item.path ? "bg-accent-subtle text-accent font-medium" : "text-secondary-custom hover:bg-border-subtle"
+                location.pathname === item.path || (item.path === "/admin" && location.pathname === "/admin" && currentView === "models")
+                  ? "bg-accent-subtle text-accent font-medium" : "text-secondary-custom hover:bg-border-subtle"
               }`}
             >
               <item.icon size={15} strokeWidth={1.5} />
@@ -64,7 +83,6 @@ export default function Admin() {
           ))}
         </div>
 
-        {/* Mobile top tabs */}
         <div className="md:hidden absolute top-0 left-0 right-0 z-10 bg-card border-b border-border flex overflow-x-auto px-2 py-1.5 gap-1">
           {adminNav.map((item) => (
             <button
@@ -81,10 +99,428 @@ export default function Admin() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8 pt-12 md:pt-8 pb-20 md:pb-8">
-          {currentView === "agents" ? <AgentsView /> : currentView === "upload" ? <UploadView /> : <ModelsTable />}
+          {currentView === "health" ? <HealthView /> :
+           currentView === "users" ? <UsersView /> :
+           currentView === "contacts" ? <ContactsView /> :
+           currentView === "agents" ? <AgentsView /> :
+           currentView === "upload" ? <UploadView /> :
+           currentView === "analytics" ? <AnalyticsView /> :
+           currentView === "settings" ? <SettingsView /> :
+           <ModelsTable />}
         </div>
       </div>
     </MainLayout>
+  );
+}
+
+// ── HEALTH CHECK VIEW ──
+function HealthView() {
+  const [checks, setChecks] = useState<{ name: string; status: "ok" | "error" | "checking"; detail: string }[]>([]);
+  const [checking, setChecking] = useState(false);
+
+  const runChecks = async () => {
+    setChecking(true);
+    const results: typeof checks = [];
+
+    // DB connection
+    try {
+      const { data, error } = await supabase.from("platform_settings").select("key").limit(1);
+      results.push({ name: "Database Connection", status: error ? "error" : "ok", detail: error ? error.message : "Connected" });
+    } catch { results.push({ name: "Database Connection", status: "error", detail: "Failed" }); }
+
+    // Auth service
+    try {
+      const { error } = await supabase.auth.getSession();
+      results.push({ name: "Authentication Service", status: error ? "error" : "ok", detail: error ? error.message : "Operational" });
+    } catch { results.push({ name: "Authentication Service", status: "error", detail: "Failed" }); }
+
+    // Storage
+    try {
+      const { data, error } = await supabase.storage.listBuckets();
+      results.push({ name: "Storage Service", status: error ? "error" : "ok", detail: error ? error.message : `${data?.length || 0} buckets` });
+    } catch { results.push({ name: "Storage Service", status: "error", detail: "Failed" }); }
+
+    // Chat Edge Function
+    try {
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
+        method: "OPTIONS",
+        headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+      });
+      results.push({ name: "Chat Edge Function", status: r.ok || r.status === 204 ? "ok" : "error", detail: r.ok || r.status === 204 ? "Responding" : `Status ${r.status}` });
+    } catch { results.push({ name: "Chat Edge Function", status: "error", detail: "Unreachable" }); }
+
+    // TTS Edge Function
+    try {
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+        method: "OPTIONS",
+        headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+      });
+      results.push({ name: "TTS Edge Function", status: r.ok || r.status === 204 ? "ok" : "error", detail: r.ok || r.status === 204 ? "Responding" : `Status ${r.status}` });
+    } catch { results.push({ name: "TTS Edge Function", status: "error", detail: "Unreachable" }); }
+
+    // Enhance Model Edge Function
+    try {
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enhance-model`, {
+        method: "OPTIONS",
+        headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+      });
+      results.push({ name: "Enhance Model Function", status: r.ok || r.status === 204 ? "ok" : "error", detail: r.ok || r.status === 204 ? "Responding" : `Status ${r.status}` });
+    } catch { results.push({ name: "Enhance Model Function", status: "error", detail: "Unreachable" }); }
+
+    // 3D Model Gen
+    try {
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-3d-model`, {
+        method: "OPTIONS",
+        headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+      });
+      results.push({ name: "3D Model Generator", status: r.ok || r.status === 204 ? "ok" : "error", detail: r.ok || r.status === 204 ? "Responding" : `Status ${r.status}` });
+    } catch { results.push({ name: "3D Model Generator", status: "error", detail: "Unreachable" }); }
+
+    // Models count
+    try {
+      const { count, error } = await supabase.from("models").select("id", { count: "exact", head: true });
+      results.push({ name: "3D Models Database", status: error ? "error" : "ok", detail: error ? error.message : `${count || 0} models` });
+    } catch { results.push({ name: "3D Models Database", status: "error", detail: "Failed" }); }
+
+    // AI Agents count
+    try {
+      const { count, error } = await supabase.from("ai_agents").select("id", { count: "exact", head: true });
+      results.push({ name: "AI Agents Database", status: error ? "error" : "ok", detail: error ? error.message : `${count || 0} agents` });
+    } catch { results.push({ name: "AI Agents Database", status: "error", detail: "Failed" }); }
+
+    // Maintenance mode
+    try {
+      const { data } = await supabase.from("platform_settings").select("value").eq("key", "maintenance_mode").maybeSingle();
+      const val = data?.value as { enabled?: boolean } | null;
+      results.push({ name: "Maintenance Mode", status: val?.enabled ? "error" : "ok", detail: val?.enabled ? "⚠️ ENABLED" : "Disabled" });
+    } catch { results.push({ name: "Maintenance Mode", status: "error", detail: "Can't read" }); }
+
+    setChecks(results);
+    setChecking(false);
+  };
+
+  useEffect(() => { runChecks(); }, []);
+
+  const okCount = checks.filter(c => c.status === "ok").length;
+  const errCount = checks.filter(c => c.status === "error").length;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-[20px] font-semibold text-primary-custom">Platform Health</h1>
+          <p className="text-[12px] text-tertiary-custom mt-0.5">
+            {checks.length > 0 ? `${okCount} healthy, ${errCount} issues` : "Running diagnostics..."}
+          </p>
+        </div>
+        <button onClick={runChecks} disabled={checking}
+          className="flex items-center gap-1.5 bg-accent text-accent-foreground px-4 py-2 rounded-xl text-[13px] font-medium hover:opacity-90 active:scale-[0.97] disabled:opacity-40">
+          <RefreshCw size={14} className={checking ? "animate-spin" : ""} /> Recheck
+        </button>
+      </div>
+
+      <div className="grid gap-2">
+        {checks.map((check) => (
+          <div key={check.name} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3">
+            {check.status === "ok" ? <CheckCircle size={18} className="text-green-600 shrink-0" /> :
+             check.status === "error" ? <XCircle size={18} className="text-red-500 shrink-0" /> :
+             <Clock size={18} className="text-amber-500 animate-spin shrink-0" />}
+            <div className="flex-1">
+              <p className="text-[13px] font-medium text-primary-custom">{check.name}</p>
+              <p className="text-[11px] text-tertiary-custom">{check.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── USERS VIEW ──
+function UsersView() {
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [roles, setRoles] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => { loadUsers(); }, []);
+
+  const loadUsers = async () => {
+    const { data: profileData } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+    setProfiles(profileData || []);
+    const { data: roleData } = await supabase.from("user_roles").select("user_id, role");
+    const roleMap: Record<string, string> = {};
+    (roleData || []).forEach((r: any) => { roleMap[r.user_id] = r.role; });
+    setRoles(roleMap);
+    setLoading(false);
+  };
+
+  const toggleRole = async (userId: string, currentRole: string) => {
+    const newRole = currentRole === "admin" ? "student" : "admin";
+    const { error } = await supabase.from("user_roles").update({ role: newRole }).eq("user_id", userId);
+    if (error) { toast.error("Failed to update role"); return; }
+    setRoles(prev => ({ ...prev, [userId]: newRole }));
+    toast.success(`Role updated to ${newRole}`);
+  };
+
+  const allowAgentCreation = async (userId: string) => {
+    const { error } = await supabase.from("agent_creator_applications").update({ status: "approved" }).eq("user_id", userId);
+    if (error) toast.error("Failed"); else toast.success("Agent creation approved");
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-[20px] font-semibold text-primary-custom">Users</h1>
+          <p className="text-[12px] text-tertiary-custom mt-0.5">{profiles.length} registered users</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-border border-t-accent rounded-full animate-spin" /></div>
+      ) : (
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-background-secondary">
+                  {["User", "Role", "Joined", "Actions"].map(h => (
+                    <th key={h} className="label-text text-tertiary-custom text-left px-4 py-2.5 font-medium">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {profiles.map((p) => (
+                  <tr key={p.id} className="border-t border-border hover:bg-background-secondary/50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
+                          {p.avatar_url ? <img src={p.avatar_url} className="w-full h-full object-cover" /> : <Users size={14} className="text-accent" />}
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-medium text-primary-custom">{p.display_name || "Unknown"}</p>
+                          <p className="text-[10px] text-tertiary-custom">{p.username || p.user_id?.slice(0, 8)}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4">
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${roles[p.user_id] === "admin" ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}>
+                        {roles[p.user_id] || "student"}
+                      </span>
+                    </td>
+                    <td className="px-4 text-[12px] text-secondary-custom">{new Date(p.created_at).toLocaleDateString()}</td>
+                    <td className="px-4">
+                      <div className="flex gap-1.5">
+                        <button onClick={() => toggleRole(p.user_id, roles[p.user_id] || "student")}
+                          className="text-[10px] px-2.5 py-1 bg-background-secondary rounded-lg hover:bg-accent/10 text-secondary-custom hover:text-accent transition-colors font-medium"
+                          title={roles[p.user_id] === "admin" ? "Remove admin" : "Make admin"}>
+                          <Shield size={12} />
+                        </button>
+                        <button onClick={() => allowAgentCreation(p.user_id)}
+                          className="text-[10px] px-2.5 py-1 bg-background-secondary rounded-lg hover:bg-accent/10 text-secondary-custom hover:text-accent transition-colors font-medium"
+                          title="Allow agent creation">
+                          <Bot size={12} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── CONTACTS VIEW ──
+function ContactsView() {
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.from("contact_submissions").select("*").order("created_at", { ascending: false })
+      .then(({ data }) => { setContacts(data || []); setLoading(false); });
+  }, []);
+
+  return (
+    <div>
+      <div className="mb-5">
+        <h1 className="text-[20px] font-semibold text-primary-custom">Contact Submissions</h1>
+        <p className="text-[12px] text-tertiary-custom mt-0.5">{contacts.length} messages received</p>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-border border-t-accent rounded-full animate-spin" /></div>
+      ) : contacts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center border border-border rounded-xl bg-card">
+          <Mail size={32} strokeWidth={1} className="text-border mb-3" />
+          <p className="text-[14px] text-secondary-custom">No contact submissions yet</p>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {contacts.map((c) => (
+            <div key={c.id} className="bg-card border border-border rounded-xl p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <p className="text-[14px] font-semibold text-primary-custom">{c.name}</p>
+                  <p className="text-[11px] text-accent">{c.email}</p>
+                </div>
+                <span className="text-[10px] text-tertiary-custom">{new Date(c.created_at).toLocaleDateString()}</span>
+              </div>
+              <p className="text-[11px] text-accent font-medium mb-1">{c.subject}</p>
+              <p className="text-[13px] text-secondary-custom leading-relaxed">{c.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ANALYTICS VIEW ──
+function AnalyticsView() {
+  const [stats, setStats] = useState({ totalUsers: 0, totalModels: 0, totalAgents: 0, totalChats: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const [users, models, agents, chats] = await Promise.all([
+        supabase.from("profiles").select("id", { count: "exact", head: true }),
+        supabase.from("models").select("id", { count: "exact", head: true }),
+        supabase.from("ai_agents").select("id", { count: "exact", head: true }),
+        supabase.from("conversation_history").select("id", { count: "exact", head: true }),
+      ]);
+      setStats({
+        totalUsers: users.count || 0,
+        totalModels: models.count || 0,
+        totalAgents: agents.count || 0,
+        totalChats: chats.count || 0,
+      });
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const cards = [
+    { label: "Total Users", value: stats.totalUsers, icon: Users, color: "text-blue-600" },
+    { label: "3D Models", value: stats.totalModels, icon: Database, color: "text-green-600" },
+    { label: "AI Agents", value: stats.totalAgents, icon: Bot, color: "text-purple-600" },
+    { label: "Conversations", value: stats.totalChats, icon: Mail, color: "text-amber-600" },
+  ];
+
+  return (
+    <div>
+      <h1 className="text-[20px] font-semibold text-primary-custom mb-5">Analytics</h1>
+      {loading ? (
+        <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-border border-t-accent rounded-full animate-spin" /></div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {cards.map(c => (
+            <div key={c.label} className="bg-card border border-border rounded-xl p-4">
+              <c.icon size={20} className={`${c.color} mb-2`} />
+              <p className="text-2xl font-bold text-primary-custom">{c.value}</p>
+              <p className="text-[11px] text-tertiary-custom">{c.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── SETTINGS VIEW (Maintenance + API Keys) ──
+function SettingsView() {
+  const { user } = useAuth();
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenanceMsg, setMaintenanceMsg] = useState("Platform is under maintenance. Please check back soon.");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    supabase.from("platform_settings").select("key, value").eq("key", "maintenance_mode").maybeSingle()
+      .then(({ data }) => {
+        if (data?.value) {
+          const v = data.value as { enabled?: boolean; message?: string };
+          setMaintenanceEnabled(!!v.enabled);
+          setMaintenanceMsg(v.message || "");
+        }
+        setLoading(false);
+      });
+  }, []);
+
+  const saveMaintenance = async () => {
+    setSaving(true);
+    const { error } = await supabase.from("platform_settings")
+      .update({ value: { enabled: maintenanceEnabled, message: maintenanceMsg }, updated_at: new Date().toISOString(), updated_by: user?.id })
+      .eq("key", "maintenance_mode");
+    if (error) toast.error("Failed to save"); else toast.success(maintenanceEnabled ? "Maintenance mode ON" : "Maintenance mode OFF");
+    setSaving(false);
+  };
+
+  if (loading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-border border-t-accent rounded-full animate-spin" /></div>;
+
+  return (
+    <div className="max-w-xl space-y-6">
+      <h1 className="text-[20px] font-semibold text-primary-custom">Platform Settings</h1>
+
+      {/* Maintenance Mode */}
+      <div className="bg-card border border-border rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Power size={18} className={maintenanceEnabled ? "text-red-500" : "text-green-600"} />
+            <h2 className="text-[15px] font-semibold text-primary-custom">Maintenance Mode</h2>
+          </div>
+          <button onClick={() => setMaintenanceEnabled(!maintenanceEnabled)}
+            className={`relative w-12 h-6 rounded-full transition-colors ${maintenanceEnabled ? "bg-red-500" : "bg-green-500"}`}>
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${maintenanceEnabled ? "left-6" : "left-0.5"}`} />
+          </button>
+        </div>
+        <textarea value={maintenanceMsg} onChange={(e) => setMaintenanceMsg(e.target.value)} rows={2}
+          className="w-full bg-background-secondary border border-border rounded-xl px-3 py-2 text-[13px] text-primary-custom focus:outline-none focus:border-accent resize-none mb-3"
+          placeholder="Maintenance message..." />
+        <button onClick={saveMaintenance} disabled={saving}
+          className="flex items-center gap-1.5 bg-accent text-accent-foreground px-4 py-2 rounded-xl text-[13px] font-medium hover:opacity-90 disabled:opacity-40">
+          <Save size={14} /> {saving ? "Saving..." : "Save Settings"}
+        </button>
+      </div>
+
+      {/* API Key Management Info */}
+      <div className="bg-card border border-border rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Key size={18} className="text-accent" />
+          <h2 className="text-[15px] font-semibold text-primary-custom">API Keys</h2>
+        </div>
+        <p className="text-[12px] text-secondary-custom mb-3">API keys are managed securely through the backend. Contact the development team to rotate keys.</p>
+        <div className="space-y-2">
+          {["LOVABLE_API_KEY", "ELEVENLABS_API_KEY"].map(key => (
+            <div key={key} className="flex items-center justify-between bg-background-secondary rounded-lg px-3 py-2">
+              <span className="text-[12px] font-mono text-primary-custom">{key}</span>
+              <CheckCircle size={14} className="text-green-600" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Usage Limits */}
+      <div className="bg-card border border-border rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Crown size={18} className="text-accent" />
+          <h2 className="text-[15px] font-semibold text-primary-custom">Usage Limits (Free Tier)</h2>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between bg-background-secondary rounded-lg px-3 py-2">
+            <span className="text-[12px] text-primary-custom">Chats per day</span>
+            <span className="text-[13px] font-semibold text-accent">3</span>
+          </div>
+          <div className="flex items-center justify-between bg-background-secondary rounded-lg px-3 py-2">
+            <span className="text-[12px] text-primary-custom">3D Generations per day</span>
+            <span className="text-[13px] font-semibold text-accent">3</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -116,7 +552,7 @@ function AgentsView() {
 - Use analogies from daily life
 - Never sound like ChatGPT or a textbook
 - End with a follow-up question to keep them curious`,
-      greeting_message: "Namaste! 🙏 Main tumhara science companion hoon. Aaj kya explore karna hai? Heart, DNA, Solar System — jo topic pasand ho batao!",
+      greeting_message: "Namaste! 🙏 Main tumhara science companion hoon. Aaj kya explore karna hai?",
       language_style: "hindi",
       knowledge_areas: [],
       research_papers: [],
@@ -169,14 +605,11 @@ function AgentsView() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="w-6 h-6 border-2 border-border border-t-accent rounded-full animate-spin" />
-        </div>
+        <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-border border-t-accent rounded-full animate-spin" /></div>
       ) : agents.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center border border-border rounded-xl bg-card">
           <Bot size={36} strokeWidth={1} className="text-border mb-3" />
           <p className="text-[14px] text-secondary-custom">No AI agents yet</p>
-          <p className="text-[12px] text-tertiary-custom mt-1">Create your first personalized learning companion</p>
           <button onClick={createNew} className="mt-4 flex items-center gap-1.5 bg-accent text-accent-foreground px-4 py-2 rounded-xl text-[13px] font-medium">
             <Sparkles size={14} /> Create Agent
           </button>
@@ -184,7 +617,7 @@ function AgentsView() {
       ) : (
         <div className="grid gap-3">
           {agents.map((agent) => (
-            <div key={agent.id} className="bg-card border border-border rounded-xl p-4 flex items-start gap-3 group">
+            <div key={agent.id} className="bg-card border border-border rounded-xl p-4 flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
                 <Bot size={20} className="text-accent" />
               </div>
@@ -203,7 +636,7 @@ function AgentsView() {
                 </div>
               </div>
               <div className="flex flex-col gap-1 shrink-0">
-                <button onClick={() => togglePublish(agent.id, agent.is_published)} className="p-1.5 hover:bg-background-secondary rounded-lg transition-colors" title={agent.is_published ? "Unpublish" : "Publish"}>
+                <button onClick={() => togglePublish(agent.id, agent.is_published)} className="p-1.5 hover:bg-background-secondary rounded-lg transition-colors">
                   {agent.is_published ? <EyeOff size={14} className="text-tertiary-custom" /> : <Eye size={14} className="text-accent" />}
                 </button>
                 <button onClick={() => setEditing(agent)} className="p-1.5 hover:bg-background-secondary rounded-lg transition-colors">
@@ -252,109 +685,70 @@ function AgentEditor({ agent, onSave, onCancel }: { agent: any; onSave: (a: any)
           <Field label="Agent Name" value={form.name} onChange={(v) => update("name", v)} placeholder="e.g. Saathi (साथी)" />
           <Field label="Slug" value={form.slug} onChange={(v) => update("slug", v)} placeholder="auto-generated" helper="URL-friendly name" />
         </div>
-
-        <Field label="Personality" value={form.personality} onChange={(v) => update("personality", v)} placeholder="warm, friendly Nepali guide..." />
-
+        <Field label="Personality" value={form.personality} onChange={(v) => update("personality", v)} placeholder="warm, friendly guide..." />
         <div>
           <label className="text-[12px] font-medium text-primary-custom block mb-1">System Prompt</label>
-          <textarea
-            value={form.system_prompt}
-            onChange={(e) => update("system_prompt", e.target.value)}
-            rows={8}
-            className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-[13px] text-primary-custom placeholder:text-tertiary-custom focus:outline-none focus:border-accent transition-colors resize-none"
-            placeholder="Define the agent's behavior, tone, and expertise..."
-          />
-          <p className="text-[10px] text-tertiary-custom mt-1">This is the core personality. Make it specific and warm.</p>
+          <textarea value={form.system_prompt} onChange={(e) => update("system_prompt", e.target.value)} rows={8}
+            className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-[13px] text-primary-custom placeholder:text-tertiary-custom focus:outline-none focus:border-accent transition-colors resize-none" />
         </div>
-
         <div>
           <label className="text-[12px] font-medium text-primary-custom block mb-1">Greeting Message</label>
-          <textarea
-            value={form.greeting_message}
-            onChange={(e) => update("greeting_message", e.target.value)}
-            rows={3}
-            className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-[13px] text-primary-custom placeholder:text-tertiary-custom focus:outline-none focus:border-accent transition-colors resize-none"
-          />
+          <textarea value={form.greeting_message} onChange={(e) => update("greeting_message", e.target.value)} rows={3}
+            className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-[13px] text-primary-custom focus:outline-none focus:border-accent transition-colors resize-none" />
         </div>
-
         <div>
           <label className="text-[12px] font-medium text-primary-custom block mb-1">Language Style</label>
-          <select
-            value={form.language_style}
-            onChange={(e) => update("language_style", e.target.value)}
-            className="w-full bg-card border border-border rounded-xl h-10 px-3 text-[13px] text-primary-custom focus:outline-none focus:border-accent"
-          >
+          <select value={form.language_style} onChange={(e) => update("language_style", e.target.value)}
+            className="w-full bg-card border border-border rounded-xl h-10 px-3 text-[13px] text-primary-custom focus:outline-none focus:border-accent">
             <option value="english">English</option>
             <option value="hindi">Hindi</option>
             <option value="mixed">Mixed English + Hindi</option>
           </select>
         </div>
-
-        {/* Knowledge areas */}
         <div>
           <label className="text-[12px] font-medium text-primary-custom block mb-1">Knowledge Areas</label>
           <div className="flex gap-1.5 flex-wrap mb-2">
             {(form.knowledge_areas || []).map((area: string, i: number) => (
               <span key={i} className="text-[11px] bg-accent/10 text-accent px-2.5 py-1 rounded-full flex items-center gap-1">
                 {area}
-                <button onClick={() => update("knowledge_areas", form.knowledge_areas.filter((_: string, j: number) => j !== i))}>
-                  <X size={10} />
-                </button>
+                <button onClick={() => update("knowledge_areas", form.knowledge_areas.filter((_: string, j: number) => j !== i))}><X size={10} /></button>
               </span>
             ))}
           </div>
           <div className="flex gap-2">
-            <input
-              value={knowledgeInput}
-              onChange={(e) => setKnowledgeInput(e.target.value)}
+            <input value={knowledgeInput} onChange={(e) => setKnowledgeInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addKnowledge())}
-              placeholder="e.g. Biology, Physics, NCERT Class 10..."
-              className="flex-1 bg-card border border-border rounded-xl h-9 px-3 text-[12px] text-primary-custom placeholder:text-tertiary-custom focus:outline-none focus:border-accent"
-            />
+              placeholder="e.g. Biology, Physics..."
+              className="flex-1 bg-card border border-border rounded-xl h-9 px-3 text-[12px] text-primary-custom placeholder:text-tertiary-custom focus:outline-none focus:border-accent" />
             <button onClick={addKnowledge} className="px-3 bg-background-secondary rounded-xl text-[12px] text-secondary-custom hover:text-primary-custom">Add</button>
           </div>
         </div>
-
-        {/* Research papers */}
         <div>
           <label className="text-[12px] font-medium text-primary-custom block mb-1">Research Papers / References</label>
           <div className="space-y-1 mb-2">
             {(form.research_papers || []).map((paper: string, i: number) => (
               <div key={i} className="text-[11px] bg-card border border-border px-3 py-1.5 rounded-lg flex items-center justify-between">
                 <span className="text-secondary-custom truncate">{paper}</span>
-                <button onClick={() => update("research_papers", form.research_papers.filter((_: string, j: number) => j !== i))}>
-                  <X size={10} className="text-tertiary-custom" />
-                </button>
+                <button onClick={() => update("research_papers", form.research_papers.filter((_: string, j: number) => j !== i))}><X size={10} className="text-tertiary-custom" /></button>
               </div>
             ))}
           </div>
           <div className="flex gap-2">
-            <input
-              value={paperInput}
-              onChange={(e) => setPaperInput(e.target.value)}
+            <input value={paperInput} onChange={(e) => setPaperInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addPaper())}
               placeholder="Paste paper URL or title..."
-              className="flex-1 bg-card border border-border rounded-xl h-9 px-3 text-[12px] text-primary-custom placeholder:text-tertiary-custom focus:outline-none focus:border-accent"
-            />
+              className="flex-1 bg-card border border-border rounded-xl h-9 px-3 text-[12px] text-primary-custom placeholder:text-tertiary-custom focus:outline-none focus:border-accent" />
             <button onClick={addPaper} className="px-3 bg-background-secondary rounded-xl text-[12px] text-secondary-custom hover:text-primary-custom">Add</button>
           </div>
         </div>
-
-        <Field label="ElevenLabs Voice ID" value={form.voice_id || ""} onChange={(v) => update("voice_id", v)} placeholder="EXAVITQu4vr4xnSDxMaL" helper="Sarah (warm female) is default. Find more at ElevenLabs Voice Library." />
-
+        <Field label="ElevenLabs Voice ID" value={form.voice_id || ""} onChange={(v) => update("voice_id", v)} placeholder="EXAVITQu4vr4xnSDxMaL" />
         <div className="flex gap-2.5 pt-3">
-          <button
-            onClick={() => onSave({ ...form, is_published: false })}
-            disabled={!form.name || !form.system_prompt}
-            className="px-5 py-2.5 border border-border rounded-xl text-[13px] font-medium text-secondary-custom hover:bg-background-secondary disabled:opacity-40 flex items-center gap-1.5"
-          >
+          <button onClick={() => onSave({ ...form, is_published: false })} disabled={!form.name || !form.system_prompt}
+            className="px-5 py-2.5 border border-border rounded-xl text-[13px] font-medium text-secondary-custom hover:bg-background-secondary disabled:opacity-40 flex items-center gap-1.5">
             <Save size={14} /> Save Draft
           </button>
-          <button
-            onClick={() => onSave({ ...form, is_published: true })}
-            disabled={!form.name || !form.system_prompt}
-            className="px-5 py-2.5 bg-accent text-accent-foreground rounded-xl text-[13px] font-medium hover:opacity-90 active:scale-[0.97] disabled:opacity-40 flex items-center gap-1.5"
-          >
+          <button onClick={() => onSave({ ...form, is_published: true })} disabled={!form.name || !form.system_prompt}
+            className="px-5 py-2.5 bg-accent text-accent-foreground rounded-xl text-[13px] font-medium hover:opacity-90 active:scale-[0.97] disabled:opacity-40 flex items-center gap-1.5">
             <Sparkles size={14} /> Publish
           </button>
         </div>
@@ -363,7 +757,7 @@ function AgentEditor({ agent, onSave, onCancel }: { agent: any; onSave: (a: any)
   );
 }
 
-// ── MODELS TABLE (unchanged) ──
+// ── MODELS TABLE ──
 function ModelsTable() {
   const [models, setModels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -429,7 +823,7 @@ function ModelsTable() {
   );
 }
 
-// ── UPLOAD VIEW (unchanged) ──
+// ── UPLOAD VIEW ──
 function UploadView() {
   const { user } = useAuth();
   const navigate = useNavigate();
