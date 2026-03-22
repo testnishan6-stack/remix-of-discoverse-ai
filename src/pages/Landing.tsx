@@ -10,7 +10,7 @@ import {
   ChevronRight, Users, TrendingUp, Award, Check, X, Mail,
   Shield, Handshake, FileText, MessageSquare, Menu, ExternalLink,
   Star, Rocket, Eye, Play, Cpu, Lock, Crown, Phone, DollarSign,
-  Briefcase, Scale, AlertTriangle, UserPlus, Heart, Send,
+  Briefcase, Scale, AlertTriangle, UserPlus, Heart, Send, Share2,
 } from "lucide-react";
 
 /* ── Reveal hook ── */
