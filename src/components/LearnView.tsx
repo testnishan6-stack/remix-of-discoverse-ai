@@ -404,13 +404,19 @@ export function LearnView() {
         </div>
         <button
           onClick={() => handleGenerate()}
-          disabled={isLoading || !topicInput.trim()}
+          disabled={isLoading || !topicInput.trim() || !canGenerateModel}
           className="bg-accent text-accent-foreground px-4 rounded-xl text-[13px] font-medium hover:opacity-90 transition-opacity active:scale-[0.97] disabled:opacity-40 flex items-center gap-1.5 shrink-0"
         >
           {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
           <span className="hidden sm:inline">Generate</span>
         </button>
       </div>
+
+      <div className="px-3 flex items-center justify-between">
+        <UsageCounter remaining={modelsRemaining} total={3} type="model" />
+      </div>
+
+      <UsageLimitBanner type="model" remaining={modelsRemaining} total={3} />
 
       {/* Topic chips */}
       <div className="px-3 flex gap-1.5 overflow-x-auto pb-2 scrollbar-none shrink-0">
