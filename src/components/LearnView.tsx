@@ -87,9 +87,9 @@ const normalizeSimulationData = (rawSimulation: unknown, availableParts: string[
   return {
     title: topicLabel,
     steps: [
-      { title: topicLabel, part: "", color: fallbackStepColors[0], narration_en: `This is ${topicLabel}. Tap play to hear each part explained.`, narration_hi: `Yo ${topicLabel} ho. Sunna play garnus.`, label_en: topicLabel, label_hi: topicLabel, camera: { x: 0, y: 0, z: 4 } },
-      { title: "Key Parts", part: "", color: fallbackStepColors[1], narration_en: `${topicLabel} has several key components.`, narration_hi: `${topicLabel} ma kehi important bhag chan.`, label_en: "Parts", label_hi: "भाग", camera: { x: 2, y: 1, z: 3 } },
-      { title: "Summary", part: "", color: fallbackStepColors[2], narration_en: `That's ${topicLabel}. Quick and clear.`, narration_hi: `Yo thiyo ${topicLabel}. Simple ra clear.`, label_en: "Summary", label_hi: "सारांश", camera: { x: 0, y: 0, z: 4 } },
+      { title: topicLabel, part: "", color: fallbackStepColors[0], narration_en: `This is ${topicLabel}. Tap play to hear each part explained.`, narration_hi: `Yeh ${topicLabel} hai. Sunne ke liye play dabayein.`, label_en: topicLabel, label_hi: topicLabel, camera: { x: 0, y: 0, z: 4 } },
+      { title: "Key Parts", part: "", color: fallbackStepColors[1], narration_en: `${topicLabel} has several key components.`, narration_hi: `${topicLabel} mein kai important hisse hain.`, label_en: "Parts", label_hi: "भाग", camera: { x: 2, y: 1, z: 3 } },
+      { title: "Summary", part: "", color: fallbackStepColors[2], narration_en: `That's ${topicLabel}. Quick and clear.`, narration_hi: `Yeh tha ${topicLabel}. Simple aur clear.`, label_en: "Summary", label_hi: "सारांश", camera: { x: 0, y: 0, z: 4 } },
     ],
   };
 };
