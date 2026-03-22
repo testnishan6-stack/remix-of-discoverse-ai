@@ -6,7 +6,7 @@ import {
   Eye,
 } from "lucide-react";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { ModelViewer } from "./ModelViewer";
+import { ModelViewer, type ProceduralPrimitive } from "./ModelViewer";
 import { useApp } from "@/contexts/AppContext";
 import { useTTS } from "@/hooks/useTTS";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,7 +66,6 @@ const extractModelPartsFromGlb = async (url: string): Promise<string[]> => {
 const normalizeSimulationData = (rawSimulation: unknown, availableParts: string[], topicLabel: string): Simulation => {
   const sim = rawSimulation as Partial<Simulation> | null;
   const rawSteps = Array.isArray(sim?.steps) ? sim.steps : [];
-
   const steps: SimStep[] = rawSteps.slice(0, 8).map((rawStep, index) => {
     const step = rawStep as Partial<SimStep>;
     const rawPart = typeof step.part === "string" ? step.part.trim() : "";
@@ -82,11 +81,9 @@ const normalizeSimulationData = (rawSimulation: unknown, availableParts: string[
         ? step.camera : { x: 0, y: 0, z: 4 },
     };
   });
-
   if (steps.length > 0) {
     return { title: typeof sim?.title === "string" && sim.title.trim() ? sim.title.trim() : topicLabel, steps };
   }
-
   return {
     title: topicLabel,
     steps: [
@@ -97,12 +94,34 @@ const normalizeSimulationData = (rawSimulation: unknown, availableParts: string[
   };
 };
 
-/* ── Premium loading messages ── */
+/* ── Similar topic keywords for fuzzy matching ── */
+const SIMILAR_TOPICS: Record<string, string[]> = {
+  car: ["jeep", "vehicle", "automobile", "truck", "bus"],
+  heart: ["cardiac", "organ", "circulatory"],
+  brain: ["neuron", "nervous", "cerebral"],
+  cell: ["membrane", "organelle", "cytoplasm"],
+  atom: ["molecule", "electron", "proton", "neutron"],
+  eye: ["retina", "optic", "vision", "lens"],
+  lung: ["respiratory", "bronchi", "pulmonary"],
+  bone: ["skeleton", "skeletal", "joint"],
+  plant: ["leaf", "root", "stem", "flower"],
+  earth: ["planet", "globe", "geological"],
+};
+
+const getSimilarTerms = (topic: string): string[] => {
+  const lower = topic.toLowerCase();
+  for (const [key, terms] of Object.entries(SIMILAR_TOPICS)) {
+    if (lower.includes(key)) return terms;
+    if (terms.some(t => lower.includes(t))) return [key, ...terms.filter(t => !lower.includes(t))];
+  }
+  return [];
+};
+
 const LOADING_MESSAGES = [
   "🔬 Scanning knowledge base...",
-  "🧠 AI is thinking deeply...",
+  "🧠 AI is analyzing the topic...",
   "⚡ Generating simulation steps...",
-  "🎨 Preparing 3D visualization...",
+  "🎨 Building 3D visualization...",
   "✨ Almost ready, finalizing...",
 ];
 
@@ -116,6 +135,7 @@ export function LearnView() {
   const [loadingMsg, setLoadingMsg] = useState("");
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [modelUrl, setModelUrl] = useState<string | null>(null);
+  const [proceduralModel, setProceduralModel] = useState<ProceduralPrimitive[] | null>(null);
   const [modelParts, setModelParts] = useState<string[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [showPanel, setShowPanel] = useState(true);
@@ -126,8 +146,8 @@ export function LearnView() {
 
   const step = simulation?.steps[currentStep];
   const resolvedHighlightPart = step ? resolvePartName(step.part, modelParts) || undefined : undefined;
+  const highlightLabel = step ? (language === "en" ? step.label_en : step.label_hi) : undefined;
 
-  // Animated loading messages
   useEffect(() => {
     if (isLoading) {
       let idx = 0;
@@ -139,25 +159,17 @@ export function LearnView() {
     }
   }, [isLoading]);
 
-  // Auto-play logic
   useEffect(() => {
     if (!isAutoPlaying || !simulation) return;
-    
     if (!isMuted && step) {
       const text = language === "en" ? step.narration_en : step.narration_hi;
       speak(text, language);
     }
-    
     if (isSpeaking) return;
-    
     autoPlayRef.current = setTimeout(() => {
-      if (currentStep < simulation.steps.length - 1) {
-        setCurrentStep((prev) => prev + 1);
-      } else {
-        setIsAutoPlaying(false);
-      }
+      if (currentStep < simulation.steps.length - 1) setCurrentStep((prev) => prev + 1);
+      else setIsAutoPlaying(false);
     }, isMuted ? 5000 : 2000);
-    
     return () => { if (autoPlayRef.current) clearTimeout(autoPlayRef.current); };
   }, [isAutoPlaying, currentStep, simulation, isMuted, language, step, speak, isSpeaking]);
 
@@ -180,18 +192,19 @@ export function LearnView() {
     setIsLoading(true);
     setSimulation(null);
     setModelParts([]);
+    setModelUrl(null);
+    setProceduralModel(null);
     setLoadingProgress(10);
     setLoadingMsg(LOADING_MESSAGES[0]);
     setShowPanel(true);
 
-    // Fuzzy search: try exact slug, then keywords, then ilike on name/subject
     const slug = t.toLowerCase().replace(/\s+/g, "_");
     const searchTerm = t.toLowerCase().trim();
     const words = searchTerm.split(/\s+/).filter(Boolean);
 
     let model: any = null;
 
-    // 1. Exact slug match
+    // ── STEP 1: Exact slug match ──
     const { data: exactMatch } = await supabase
       .from("models").select("*")
       .eq("slug", slug)
@@ -201,7 +214,7 @@ export function LearnView() {
     if (exactMatch) {
       model = exactMatch;
     } else {
-      // 2. Keywords match
+      // ── STEP 2: Keywords match ──
       const { data: keywordMatch } = await supabase
         .from("models").select("*")
         .eq("status", "published")
@@ -212,7 +225,7 @@ export function LearnView() {
       if (keywordMatch) {
         model = keywordMatch;
       } else {
-        // 3. Fuzzy name/subject search with ilike on each word
+        // ── STEP 3: Fuzzy name/subject search ──
         for (const word of words) {
           if (word.length < 2) continue;
           const pattern = `%${word}%`;
@@ -224,12 +237,46 @@ export function LearnView() {
             .limit(1).maybeSingle();
           if (fuzzyMatch) { model = fuzzyMatch; break; }
         }
+
+        // ── STEP 4: Similar terms search ──
+        if (!model) {
+          const similarTerms = getSimilarTerms(t);
+          for (const term of similarTerms) {
+            const pattern = `%${term}%`;
+            const { data: similarMatch } = await supabase
+              .from("models").select("*")
+              .eq("status", "published")
+              .or(`name.ilike.${pattern},subject.ilike.${pattern},slug.ilike.${pattern},keywords_en.cs.{${term}}`)
+              .order("viral_score", { ascending: false })
+              .limit(1).maybeSingle();
+            if (similarMatch) { model = similarMatch; break; }
+          }
+        }
       }
     }
 
     setLoadingProgress(30);
-    if (model?.file_url) { setModelUrl(model.file_url); }
-    else { setModelUrl(null); }
+
+    if (model?.file_url) {
+      setModelUrl(model.file_url);
+    } else {
+      // ── STEP 5: No model in DB → Generate procedural 3D via AI ──
+      setLoadingProgress(35);
+      setLoadingMsg("🎨 Generating 3D model with AI...");
+      try {
+        const { data: genData, error: genErr } = await supabase.functions.invoke("generate-3d-model", {
+          body: { topic: t },
+        });
+        if (!genErr && Array.isArray(genData) && genData.length > 0) {
+          setProceduralModel(genData as ProceduralPrimitive[]);
+          // Extract part names from generated model
+          const genParts = genData.map((p: any) => p.name).filter(Boolean);
+          setModelParts(genParts);
+        }
+      } catch (e) {
+        console.error("Procedural model generation failed:", e);
+      }
+    }
 
     let effectiveNamedParts: string[] = model?.named_parts?.length ? model.named_parts : [];
     if (!effectiveNamedParts.length && model?.file_url?.toLowerCase().endsWith(".glb")) {
@@ -238,6 +285,11 @@ export function LearnView() {
       if (extracted.length > 0) { effectiveNamedParts = extracted; setModelParts(extracted); }
     }
     setLoadingProgress(55);
+
+    // Use procedural model parts if no DB model parts
+    if (!effectiveNamedParts.length && proceduralModel) {
+      effectiveNamedParts = modelParts;
+    }
 
     if (model?.id) {
       const { data: cached } = await supabase.from("simulation_cache").select("*").eq("model_id", model.id).eq("language", "en").maybeSingle();
@@ -252,7 +304,6 @@ export function LearnView() {
           setCurrentStep(0);
           setLoadingProgress(100);
           await supabase.from("simulation_cache").update({ serve_count: (cached.serve_count || 0) + 1 }).eq("id", cached.id);
-          // Auto-save to library
           if (user && model?.id) {
             supabase.from("user_library").upsert({ user_id: user.id, model_id: model.id, last_step: 0 }, { onConflict: "user_id,model_id" }).then(() => {});
           }
@@ -265,15 +316,15 @@ export function LearnView() {
     setLoadingProgress(65);
     try {
       const { data, error } = await supabase.functions.invoke("enhance-model", {
-        body: { modelName: t, subject: model?.subject || "science", namedParts: effectiveNamedParts, language: "en" },
+        body: { modelName: t, subject: model?.subject || "science", namedParts: effectiveNamedParts.length > 0 ? effectiveNamedParts : modelParts, language: "en" },
       });
       if (error) throw error;
       setLoadingProgress(85);
       if (data && data.steps) {
-        const normalized = normalizeSimulationData(data, effectiveNamedParts, t);
+        const partsToUse = effectiveNamedParts.length > 0 ? effectiveNamedParts : modelParts;
+        const normalized = normalizeSimulationData(data, partsToUse, t);
         setSimulation(normalized);
         setCurrentStep(0);
-        // Auto-save to library
         if (user && model?.id) {
           supabase.from("user_library").upsert({ user_id: user.id, model_id: model.id, last_step: 0 }, { onConflict: "user_id,model_id" }).then(() => {});
         }
@@ -286,7 +337,8 @@ export function LearnView() {
       }
     } catch (err) {
       console.error("AI enhancement failed:", err);
-      setSimulation(normalizeSimulationData(null, effectiveNamedParts, t));
+      const partsToUse = effectiveNamedParts.length > 0 ? effectiveNamedParts : modelParts;
+      setSimulation(normalizeSimulationData(null, partsToUse, t));
       setCurrentStep(0);
     }
     setLoadingProgress(100);
@@ -305,7 +357,6 @@ export function LearnView() {
     if (next >= 0 && next < simulation.steps.length) setCurrentStep(next);
   };
 
-  // ── MOBILE-FIRST UI ──
   return (
     <div className="flex flex-col h-full relative">
       {/* Search bar */}
@@ -317,7 +368,7 @@ export function LearnView() {
             onChange={(e) => setTopicInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
             placeholder="Search any topic..."
-            className="w-full bg-card border border-border rounded-xl h-10 pl-9 pr-3 text-[14px] text-primary-custom placeholder:text-tertiary-custom focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-card border border-border rounded-xl h-10 pl-9 pr-3 text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent transition-colors"
           />
         </div>
         <button
@@ -337,7 +388,7 @@ export function LearnView() {
             key={t}
             onClick={() => handleGenerate(t)}
             disabled={isLoading}
-            className="shrink-0 px-3 py-1.5 bg-card border border-border rounded-full text-[11px] text-secondary-custom hover:border-accent hover:text-accent transition-all disabled:opacity-40 active:scale-[0.97]"
+            className="shrink-0 px-3 py-1.5 bg-card border border-border rounded-full text-[11px] text-muted-foreground hover:border-accent hover:text-accent transition-all disabled:opacity-40 active:scale-[0.97]"
           >
             {t}
           </button>
@@ -348,7 +399,6 @@ export function LearnView() {
       <div className="flex-1 mx-3 mb-1 bg-canvas rounded-2xl border border-subtle overflow-hidden relative min-h-0">
         {isLoading ? (
           <div className="h-full flex flex-col items-center justify-center gap-4 px-6 bg-gradient-to-b from-canvas to-background">
-            {/* Premium loading animation */}
             <div className="relative">
               <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center">
                 <Atom size={32} strokeWidth={1} className="text-accent" style={{ animation: "spin 3s linear infinite" }} />
@@ -358,17 +408,24 @@ export function LearnView() {
             <div className="w-full max-w-[200px]">
               <Progress value={loadingProgress} className="h-1.5" />
             </div>
-            <p className="text-[13px] text-primary-custom font-medium text-center animate-fade-in">{loadingMsg}</p>
-            <p className="text-[10px] text-tertiary-custom">This usually takes 5-10 seconds</p>
+            <p className="text-[13px] text-foreground font-medium text-center animate-fade-in">{loadingMsg}</p>
+            <p className="text-[10px] text-muted-foreground">This usually takes 5-10 seconds</p>
           </div>
         ) : simulation ? (
           <>
-            <ModelViewer modelUrl={modelUrl} highlightPart={resolvedHighlightPart} highlightColor={step?.color} onPartsLoaded={onPartsLoaded} />
+            <ModelViewer
+              modelUrl={modelUrl}
+              highlightPart={resolvedHighlightPart}
+              highlightColor={step?.color}
+              highlightLabel={highlightLabel}
+              onPartsLoaded={onPartsLoaded}
+              proceduralModel={proceduralModel}
+            />
 
             {/* Step indicator pill */}
             <div className="absolute top-2.5 left-2.5 bg-card/90 backdrop-blur-sm border border-border rounded-full px-2.5 py-1 flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: step?.color || "hsl(var(--accent))" }} />
-              <span className="text-[11px] font-medium text-primary-custom">
+              <span className="text-[11px] font-medium text-foreground">
                 {currentStep + 1}/{simulation.steps.length}
               </span>
             </div>
@@ -376,7 +433,7 @@ export function LearnView() {
             {/* Part label floating */}
             {step && (
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-card/90 backdrop-blur-sm border border-border px-3 py-1.5 rounded-full shadow-sm animate-fade-in" key={currentStep}>
-                <p className="text-[12px] font-medium text-primary-custom flex items-center gap-1.5">
+                <p className="text-[12px] font-medium text-foreground flex items-center gap-1.5">
                   <Eye size={12} className="text-accent" />
                   {language === "en" ? step.label_en : step.label_hi}
                 </p>
@@ -386,7 +443,7 @@ export function LearnView() {
             {/* Canvas controls */}
             <div className="absolute top-2.5 right-2.5 flex gap-1">
               <button className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded-full flex items-center justify-center active:scale-[0.95]">
-                <RotateCcw size={13} strokeWidth={1.5} className="text-secondary-custom" />
+                <RotateCcw size={13} strokeWidth={1.5} className="text-muted-foreground" />
               </button>
             </div>
           </>
@@ -397,13 +454,12 @@ export function LearnView() {
         )}
       </div>
 
-      {/* Bottom Panel - fixed above mobile nav with proper spacing */}
+      {/* Bottom Panel */}
       {simulation && !isLoading && (
         <div className={`bg-card border-t border-subtle rounded-t-2xl transition-all duration-300 ${showPanel ? "max-h-[40vh]" : "max-h-[100px]"} flex flex-col shrink-0 overflow-hidden mb-14 md:mb-0`}>
-          {/* Panel handle */}
           <button
             onClick={() => setShowPanel(!showPanel)}
-            className="w-full flex items-center justify-center py-1.5 shrink-0 active:bg-background-secondary"
+            className="w-full flex items-center justify-center py-1.5 shrink-0 active:bg-secondary"
           >
             <div className="w-8 h-1 bg-border rounded-full" />
           </button>
@@ -431,9 +487,9 @@ export function LearnView() {
             <div className="px-4 flex-1 overflow-y-auto animate-fade-in" key={currentStep}>
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: step.color }} />
-                <h3 className="text-[15px] font-semibold text-primary-custom">{step.title}</h3>
+                <h3 className="text-[15px] font-semibold text-foreground">{step.title}</h3>
               </div>
-              <p className="text-[13px] text-secondary-custom leading-relaxed pl-[18px]">
+              <p className="text-[13px] text-muted-foreground leading-relaxed pl-[18px]">
                 {language === "en" ? step.narration_en : step.narration_hi}
               </p>
 
@@ -448,23 +504,22 @@ export function LearnView() {
                     />
                   ))}
                 </div>
-                <span className="text-[10px] text-tertiary-custom">
+                <span className="text-[10px] text-muted-foreground">
                   {isSpeaking ? "🔊 Speaking..." : "Tap ▶ to listen"}
                 </span>
               </div>
             </div>
           )}
 
-          {/* Controls bar - always visible */}
+          {/* Controls bar */}
           <div className="px-3 py-2 flex items-center justify-between shrink-0 border-t border-subtle">
-            {/* Language toggle */}
             <div className="flex rounded-full overflow-hidden border border-border h-7">
               {(["en", "hi"] as const).map((l) => (
                 <button
                   key={l}
                   onClick={() => { stopTTS(); setLanguage(l); }}
                   className={`px-2.5 text-[10px] font-medium transition-colors active:scale-[0.95] ${
-                    language === l ? "bg-accent text-accent-foreground" : "text-secondary-custom hover:bg-background-secondary"
+                    language === l ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-secondary"
                   }`}
                 >
                   {l === "en" ? "EN" : "ने"}
@@ -472,38 +527,26 @@ export function LearnView() {
               ))}
             </div>
 
-            {/* Playback */}
             <div className="flex items-center gap-1.5">
               <button onClick={() => goStep(-1)} disabled={currentStep === 0} className="w-8 h-8 rounded-full border border-border flex items-center justify-center disabled:opacity-20 active:scale-[0.95]">
-                <ChevronLeft size={14} strokeWidth={1.5} className="text-secondary-custom" />
+                <ChevronLeft size={14} strokeWidth={1.5} className="text-muted-foreground" />
               </button>
-
-              <button
-                onClick={handlePlayNarration}
-                className="w-8 h-8 rounded-full bg-card border border-border flex items-center justify-center active:scale-[0.95]"
-              >
-                {isSpeaking ? <Square size={10} className="text-accent" /> : <Volume2 size={13} className="text-secondary-custom" />}
+              <button onClick={handlePlayNarration} className="w-8 h-8 rounded-full bg-card border border-border flex items-center justify-center active:scale-[0.95]">
+                {isSpeaking ? <Square size={10} className="text-accent" /> : <Volume2 size={13} className="text-muted-foreground" />}
               </button>
-
-              <button
-                onClick={handleAutoPlay}
-                className="w-10 h-10 rounded-full bg-accent flex items-center justify-center hover:opacity-90 active:scale-[0.95] transition-all shadow-md"
-              >
+              <button onClick={handleAutoPlay} className="w-10 h-10 rounded-full bg-accent flex items-center justify-center hover:opacity-90 active:scale-[0.95] transition-all shadow-md">
                 {isAutoPlaying ? <Pause size={14} className="text-accent-foreground" /> : <Play size={14} className="text-accent-foreground ml-0.5" />}
               </button>
-
               <button onClick={() => goStep(1)} disabled={currentStep === (simulation?.steps.length ?? 0) - 1} className="w-8 h-8 rounded-full border border-border flex items-center justify-center disabled:opacity-20 active:scale-[0.95]">
-                <ChevronRight size={14} strokeWidth={1.5} className="text-secondary-custom" />
+                <ChevronRight size={14} strokeWidth={1.5} className="text-muted-foreground" />
               </button>
-
               <button onClick={() => setIsMuted(!isMuted)} className="w-8 h-8 rounded-full border border-border flex items-center justify-center active:scale-[0.95]">
-                {isMuted ? <VolumeX size={13} className="text-tertiary-custom" /> : <Volume2 size={13} className="text-tertiary-custom" />}
+                {isMuted ? <VolumeX size={13} className="text-muted-foreground" /> : <Volume2 size={13} className="text-muted-foreground" />}
               </button>
             </div>
 
-            {/* Share */}
             <button className="w-8 h-8 rounded-full border border-border flex items-center justify-center active:scale-[0.95]">
-              <Share2 size={13} className="text-tertiary-custom" />
+              <Share2 size={13} className="text-muted-foreground" />
             </button>
           </div>
         </div>
