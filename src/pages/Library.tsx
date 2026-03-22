@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Search, Play, Trash2, BookOpen } from "lucide-react";
+import { Search, Play, Trash2, BookOpen, Share2 } from "lucide-react";
 import { MainLayout } from "@/components/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const subjects = ["All", "Biology", "Physics", "Chemistry", "Astronomy", "Engineering", "Mathematics"];
 
@@ -45,6 +46,7 @@ export default function Library() {
   const removeItem = async (id: string) => {
     await supabase.from("user_library").delete().eq("id", id);
     setItems(items.filter((i) => i.id !== id));
+    toast.success("Removed from library");
   };
 
   const filtered = items.filter((item) => {
@@ -58,32 +60,32 @@ export default function Library() {
   return (
     <MainLayout title="Library">
       <div className="p-5 md:p-8 overflow-y-auto h-full pb-20 md:pb-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-[24px] font-semibold text-primary-custom">Library</h1>
-            <p className="text-[13px] text-tertiary-custom mt-0.5">Your saved simulations</p>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Library</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Your saved simulations</p>
           </div>
           <div className="relative w-full md:w-64">
-            <Search size={14} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-tertiary-custom" />
+            <Search size={14} strokeWidth={1.5} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search..."
-              className="w-full bg-card border border-border rounded-xl h-9 pl-9 pr-3 text-[13px] text-primary-custom placeholder:text-tertiary-custom focus:outline-none focus:border-primary transition-colors"
+              className="w-full bg-card border border-border rounded-xl h-10 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
             />
           </div>
         </div>
 
         {/* Subject tabs */}
-        <div className="flex gap-0.5 border-b border-border mb-5 overflow-x-auto scrollbar-none">
+        <div className="flex gap-1 mb-6 overflow-x-auto scrollbar-none pb-1">
           {subjects.map((s) => (
             <button
               key={s}
               onClick={() => setActiveSubject(s)}
-              className={`px-3.5 py-2 text-[13px] whitespace-nowrap border-b-2 transition-all duration-150 ${
+              className={`px-4 py-2 text-xs font-semibold whitespace-nowrap rounded-full transition-all duration-150 ${
                 activeSubject === s
-                  ? "border-accent text-accent font-medium"
-                  : "border-transparent text-secondary-custom hover:text-primary-custom"
+                  ? "bg-accent text-accent-foreground shadow-sm"
+                  : "bg-secondary text-muted-foreground hover:text-foreground"
               }`}
             >
               {s}
@@ -97,37 +99,39 @@ export default function Library() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-center">
-            <BookOpen size={32} strokeWidth={1} className="text-border mb-3" />
-            <p className="text-[14px] text-secondary-custom">No simulations saved yet</p>
-            <p className="text-[12px] text-tertiary-custom mt-1">Explore topics in Chat or Learn mode to save them here</p>
+            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
+              <BookOpen size={28} strokeWidth={1} className="text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-muted-foreground">No simulations saved yet</p>
+            <p className="text-xs text-muted-foreground mt-1">Explore topics in Chat or Learn mode to save them here</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((item) => (
               <div
                 key={item.id}
-                className="bg-card border border-border rounded-xl hover:shadow-md hover:-translate-y-0.5 transition-all duration-250 overflow-hidden"
+                className="bg-card border border-border rounded-2xl hover:shadow-lg hover:-translate-y-0.5 hover:border-accent/20 transition-all duration-250 overflow-hidden group"
               >
-                <div className="h-[160px] bg-canvas flex items-center justify-center relative">
-                  <div className="w-16 h-16 rounded-full bg-border/40 flex items-center justify-center">
-                    <div className="w-8 h-8 rounded-full bg-border/60" />
+                <div className="h-[160px] bg-gradient-to-br from-accent/5 to-secondary flex items-center justify-center relative">
+                  <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-accent/20" />
                   </div>
-                  <span className="absolute top-2.5 right-2.5 bg-card/90 text-[11px] text-secondary-custom px-2 py-0.5 rounded-full font-medium">
+                  <span className="absolute top-3 right-3 bg-card/90 backdrop-blur-sm text-[10px] text-muted-foreground px-2.5 py-1 rounded-full font-semibold uppercase tracking-wider">
                     {item.models?.subject}
                   </span>
                 </div>
-                <div className="p-3.5">
-                  <h3 className="text-[14px] font-semibold text-primary-custom">{item.models?.name}</h3>
-                  <p className="text-[11px] text-tertiary-custom mt-0.5">
+                <div className="p-4">
+                  <h3 className="text-sm font-bold text-foreground group-hover:text-accent transition-colors">{item.models?.name}</h3>
+                  <p className="text-[11px] text-muted-foreground mt-1">
                     {new Date(item.created_at).toLocaleDateString()} · Step {(item.last_step || 0) + 1}
                   </p>
                   <div className="flex gap-2 mt-3">
-                    <button className="flex-1 flex items-center justify-center gap-1.5 bg-accent text-accent-foreground text-[12px] font-medium py-2 rounded-lg hover:opacity-90 transition-opacity">
-                      <Play size={12} strokeWidth={1.5} /> Resume
+                    <button className="flex-1 flex items-center justify-center gap-1.5 bg-accent text-accent-foreground text-xs font-semibold py-2.5 rounded-xl hover:opacity-90 transition-opacity active:scale-[0.97] shadow-sm">
+                      <Play size={13} strokeWidth={1.5} /> Resume
                     </button>
                     <button
                       onClick={() => removeItem(item.id)}
-                      className="p-2 border border-border rounded-lg text-tertiary-custom hover:text-destructive hover:border-destructive transition-colors"
+                      className="p-2.5 border border-border rounded-xl text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors active:scale-95"
                     >
                       <Trash2 size={14} strokeWidth={1.5} />
                     </button>
