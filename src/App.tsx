@@ -13,6 +13,7 @@ import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import CreateAgent from "./pages/CreateAgent";
 import AgentShare from "./pages/AgentShare";
+import PublicProfile from "./pages/PublicProfile";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
@@ -64,6 +65,7 @@ const App = () => (
               <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="/admin/*" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="/agent/:slug" element={<AgentShare />} />
+              <Route path="/u/:username" element={<PublicProfile />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="*" element={<NotFound />} />

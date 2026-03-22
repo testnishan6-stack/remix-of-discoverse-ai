@@ -91,7 +91,7 @@ export default function Profile() {
     }
     setSaving(true);
     const username = form.username.toLowerCase().replace(/[^a-z0-9_]/g, "");
-    const shareUrl = username ? `discoverseai.com/u/${username}` : null;
+    const shareUrl = username ? `${window.location.origin}/u/${username}` : null;
     
     // Use upsert so it works whether profile exists or not
     const { error } = await supabase.from("profiles").upsert({
@@ -113,8 +113,8 @@ export default function Profile() {
     setSaving(false);
   };
 
-  const copyLink = (url: string) => {
-    navigator.clipboard.writeText(`https://${url}`);
+  const copyLink = (path: string) => {
+    navigator.clipboard.writeText(`${window.location.origin}${path}`);
     setCopied(true);
     toast.success("Link copied!");
     setTimeout(() => setCopied(false), 2000);
@@ -181,7 +181,7 @@ export default function Profile() {
               </button>
             )}
             {form.username && (
-              <button onClick={() => copyLink(`discoverseai.com/u/${form.username}`)}
+              <button onClick={() => copyLink(`/u/${form.username}`)}
                 className="inline-flex items-center gap-1 text-[11px] bg-background-secondary text-secondary-custom px-2.5 py-1 rounded-full font-medium hover:bg-border transition-colors active:scale-[0.97]">
                 <Link2 size={10} /> Share Profile
               </button>
@@ -250,7 +250,7 @@ export default function Profile() {
                     </div>
                     <div className="flex items-center gap-1">
                       {agent.is_published && (
-                        <button onClick={() => copyLink(`discoverseai.com/agent/${agent.slug}`)}
+                        <button onClick={() => copyLink(`/agent/${agent.slug}`)}
                           className="p-1.5 hover:bg-background-secondary rounded-lg transition-colors" title="Copy share link">
                           <ExternalLink size={12} className="text-tertiary-custom" />
                         </button>
@@ -318,9 +318,9 @@ export default function Profile() {
               <div className="flex items-center gap-2">
                 <div className="flex-1 bg-background-secondary border border-border rounded-xl h-10 px-3 flex items-center">
                   <Link2 size={13} className="text-tertiary-custom mr-2 shrink-0" />
-                  <span className="text-[12px] text-secondary-custom truncate">discoverseai.com/u/{form.username}</span>
+                  <span className="text-[12px] text-muted-foreground truncate">{window.location.origin}/u/{form.username}</span>
                 </div>
-                <button onClick={() => copyLink(`discoverseai.com/u/${form.username}`)}
+                <button onClick={() => copyLink(`/u/${form.username}`)}
                   className="w-10 h-10 bg-card border border-border rounded-xl flex items-center justify-center hover:bg-background-secondary transition-colors shrink-0">
                   {copied ? <Check size={14} className="text-accent" /> : <Copy size={14} className="text-tertiary-custom" />}
                 </button>
