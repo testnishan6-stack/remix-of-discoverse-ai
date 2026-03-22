@@ -14,10 +14,14 @@ export function useTTS() {
       audioRef.current.src = "";
       audioRef.current = null;
     }
+    // Also stop browser TTS if active
+    if (typeof speechSynthesis !== "undefined") {
+      speechSynthesis.cancel();
+    }
     setIsSpeaking(false);
   }, []);
 
-  const speak = useCallback(async (text: string, _language: "en" | "hi" = "en") => {
+  const speak = useCallback(async (text: string, language: "en" | "hi" = "en") => {
     stop();
 
     const cleaned = text
@@ -40,14 +44,13 @@ export function useTTS() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ text: cleaned }),
+        body: JSON.stringify({ text: cleaned, language }),
         signal: controller.signal,
       });
 
       if (!response.ok) {
-        // Fallback to browser TTS if ElevenLabs fails
-        console.warn("ElevenLabs TTS failed, falling back to browser TTS");
-        fallbackBrowserTTS(cleaned, _language);
+        // Silent fallback to browser TTS
+        fallbackBrowserTTS(cleaned, language);
         return;
       }
 
@@ -68,8 +71,8 @@ export function useTTS() {
       await audio.play();
     } catch (e: any) {
       if (e.name !== "AbortError") {
-        console.warn("TTS error, falling back to browser:", e);
-        fallbackBrowserTTS(cleaned, _language);
+        // Silent fallback — user should not know
+        fallbackBrowserTTS(cleaned, language);
       } else {
         setIsSpeaking(false);
       }
@@ -77,6 +80,10 @@ export function useTTS() {
   }, [stop]);
 
   const fallbackBrowserTTS = (text: string, language: "en" | "hi") => {
+    if (typeof speechSynthesis === "undefined") {
+      setIsSpeaking(false);
+      return;
+    }
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = language === "hi" ? "hi-IN" : "en-US";
     utterance.rate = 0.95;

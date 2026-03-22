@@ -59,7 +59,7 @@ export function ChatView() {
           <div className="flex items-center justify-between mb-1">
             <div>
               <h2 className="text-2xl font-black text-foreground tracking-tight">AI Agents</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Specialized AI built by expert creators</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Powered by Discoverse AI</p>
             </div>
             <button onClick={() => navigate("/create-agent")}
               className="flex items-center gap-1.5 bg-accent text-accent-foreground px-5 py-2.5 rounded-xl text-xs font-bold hover:opacity-90 active:scale-[0.97] transition-all shadow-lg shadow-accent/15">
@@ -89,7 +89,6 @@ export function ChatView() {
             <div className="grid grid-cols-2 gap-3 pt-2">
               {filteredAgents.map((agent) => (
                 <div key={agent.id} className="bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:-translate-y-1 hover:border-accent/30 transition-all duration-300 group flex flex-col">
-                  {/* Gradient header */}
                   <div className="h-16 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent relative">
                     <div className="absolute -bottom-5 left-4">
                       <div className="w-12 h-12 rounded-xl bg-card border-2 border-card flex items-center justify-center overflow-hidden shadow-md">
@@ -250,7 +249,7 @@ export function ChatView() {
               {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} strokeWidth={1.5} />}
             </button>
           </div>
-          <p className="text-center text-[9px] text-muted-foreground mt-2 opacity-50">{selectedAgent?.name || "Discoverse AI"} · Powered by Discoverse</p>
+          <p className="text-center text-[9px] text-muted-foreground mt-2 opacity-50">{selectedAgent?.name || "Discoverse AI"} · Powered by Discoverse AI</p>
         </div>
       </div>
     </div>
