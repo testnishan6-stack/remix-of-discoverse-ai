@@ -178,6 +178,33 @@ export type Database = {
           },
         ]
       }
+      daily_usage: {
+        Row: {
+          chat_count: number
+          created_at: string
+          id: string
+          model_gen_count: number
+          usage_date: string
+          user_id: string
+        }
+        Insert: {
+          chat_count?: number
+          created_at?: string
+          id?: string
+          model_gen_count?: number
+          usage_date?: string
+          user_id: string
+        }
+        Update: {
+          chat_count?: number
+          created_at?: string
+          id?: string
+          model_gen_count?: number
+          usage_date?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       models: {
         Row: {
           class_levels: number[] | null
@@ -250,6 +277,27 @@ export type Database = {
           updated_at?: string
           uploaded_by?: string | null
           viral_score?: number | null
+        }
+        Relationships: []
+      }
+      platform_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
         }
         Relationships: []
       }
