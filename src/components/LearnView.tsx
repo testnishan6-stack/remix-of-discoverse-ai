@@ -147,7 +147,6 @@ export function LearnView() {
   const { canGenerateModel, modelsRemaining, incrementModelGen } = useUsageLimits();
   const autoPlayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingMsgRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const loadingMsgRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const step = simulation?.steps[currentStep];
   const resolvedHighlightPart = step ? resolvePartName(step.part, modelParts) || undefined : undefined;
