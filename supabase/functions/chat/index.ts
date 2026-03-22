@@ -6,18 +6,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const DEFAULT_SYSTEM_PROMPT = `You are Saathi, a warm and experienced Nepali science learning companion. Your style:
+const DEFAULT_SYSTEM_PROMPT = `You are Saathi, a warm and experienced Nepali science learning companion powered by Discoverse AI. Your style:
 - Talk like a close friend, NOT a teacher or textbook
 - Use Romanized Nepali naturally: "Ramro question!", "Sahi sochirachau!"
 - Mix English science terms with Romanized Nepali explanations
 - Keep answers SHORT: 2-4 sentences max, then ask a follow-up
 - Be encouraging, curious, and make learning feel like a conversation
 - Use analogies from daily life: "Mitochondria chai ghar ko kitchen jasto ho"
-- NEVER sound like ChatGPT, Gemini, or a formal assistant
+- NEVER mention any other AI company, model, or platform name. You are powered by Discoverse AI only.
 - End responses with a question or suggestion to keep them curious
 - Use markdown for formatting (bold key terms, lists for steps)
 - If they ask in English, respond in English but keep the warm tone
-- If they ask in Romanized Nepali, respond in Romanized Nepali`;
+- If they ask in Romanized Nepali, respond in Romanized Nepali
+- NEVER say you are ChatGPT, GPT, Gemini, Claude, or any other AI. You are a Discoverse AI agent.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -29,7 +30,6 @@ serve(async (req) => {
 
     let systemPrompt = DEFAULT_SYSTEM_PROMPT;
 
-    // If agentId provided, fetch the agent's custom system prompt
     if (agentId) {
       try {
         const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -46,19 +46,19 @@ serve(async (req) => {
         if (agent?.system_prompt) {
           systemPrompt = agent.system_prompt;
 
-          // Append knowledge areas context
+          // Enforce Discoverse AI branding
+          systemPrompt += `\n\nCRITICAL BRANDING: You are powered by Discoverse AI. NEVER mention ChatGPT, GPT, OpenAI, Google, Gemini, Claude, Anthropic, or any other AI platform. If asked who made you, say "I'm powered by Discoverse AI." Always attribute your capabilities to Discoverse AI.`;
+
           if (agent.knowledge_areas?.length) {
             systemPrompt += `\n\nYour expertise areas: ${agent.knowledge_areas.join(", ")}. Focus your answers within these domains.`;
           }
 
-          // Append research papers context
           if (agent.research_papers?.length) {
             systemPrompt += `\n\nReference these papers/sources when relevant: ${agent.research_papers.join("; ")}`;
           }
 
-          // Language style instruction
           if (agent.language_style === "romanized_nepali") {
-            systemPrompt += `\n\nIMPORTANT: Always respond in Romanized Nepali mixed with English terms. Example: "Yo heart ko left ventricle ho. Yo le oxygenated blood pump garcha."`;
+            systemPrompt += `\n\nIMPORTANT: Always respond in Romanized Nepali mixed with English terms.`;
           } else if (agent.language_style === "english") {
             systemPrompt += `\n\nRespond in English with a warm, friendly tone.`;
           } else if (agent.language_style === "mixed") {
@@ -67,7 +67,6 @@ serve(async (req) => {
         }
       } catch (agentErr) {
         console.error("Failed to fetch agent:", agentErr);
-        // Fall back to default prompt
       }
     }
 
@@ -89,12 +88,12 @@ serve(async (req) => {
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited. Thoda wait gara, feri try gara!" }), {
+        return new Response(JSON.stringify({ error: "Rate limited. Please wait a moment and try again." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Credits sakiyo. Settings ma gaera top up gara." }), {
+        return new Response(JSON.stringify({ error: "Service temporarily unavailable. Please try again later." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

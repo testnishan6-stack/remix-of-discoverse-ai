@@ -25,7 +25,7 @@ export default function Auth() {
         password,
         options: {
           data: { full_name: name },
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: "https://discoverseai.com",
         },
       });
       if (error) setError(error.message);
@@ -41,7 +41,7 @@ export default function Auth() {
     setLoading(true);
     setError("");
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+      redirect_uri: "https://discoverseai.com",
     });
     if (result.error) {
       setError(result.error.message || "Failed to sign in with Google");
@@ -52,16 +52,16 @@ export default function Auth() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-background-secondary items-center justify-center p-16">
+      <div className="hidden lg:flex lg:w-1/2 bg-secondary items-center justify-center p-16">
         <div className="max-w-md">
           <div className="flex items-center gap-3 mb-8">
             <Logo size={40} />
-            <span className="text-2xl font-semibold text-primary-custom">Discoverse</span>
+            <span className="text-2xl font-semibold text-foreground">Discoverse</span>
           </div>
-          <h1 className="text-3xl font-semibold text-primary-custom leading-tight mb-4">
+          <h1 className="text-3xl font-semibold text-foreground leading-tight mb-4">
             Explore any topic in interactive 3D
           </h1>
-          <p className="text-secondary-custom text-[15px] leading-relaxed">
+          <p className="text-muted-foreground text-[15px] leading-relaxed">
             AI-powered 3D learning with specialized agents, step-by-step simulations, and natural voice narration.
           </p>
           <div className="mt-12 space-y-4">
@@ -70,7 +70,7 @@ export default function Auth() {
                 <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
                   <ArrowRight size={12} strokeWidth={2} className="text-accent" />
                 </div>
-                <span className="text-sm text-secondary-custom">{f}</span>
+                <span className="text-sm text-muted-foreground">{f}</span>
               </div>
             ))}
           </div>
@@ -82,20 +82,20 @@ export default function Auth() {
         <div className="w-full max-w-sm">
           <div className="lg:hidden flex items-center gap-2 mb-8">
             <Logo size={28} />
-            <span className="text-lg font-semibold text-primary-custom">Discoverse</span>
+            <span className="text-lg font-semibold text-foreground">Discoverse</span>
           </div>
 
-          <h2 className="text-xl font-semibold text-primary-custom mb-1">
+          <h2 className="text-xl font-semibold text-foreground mb-1">
             {isSignUp ? "Create your account" : "Welcome back"}
           </h2>
-          <p className="text-sm text-secondary-custom mb-6">
+          <p className="text-sm text-muted-foreground mb-6">
             {isSignUp ? "Start exploring 3D learning" : "Sign in to continue learning"}
           </p>
 
           <button
             onClick={handleGoogleAuth}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 h-11 bg-card border border-border rounded-lg text-sm font-medium text-primary-custom hover:bg-background-secondary transition-colors duration-150 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-3 h-11 bg-card border border-border rounded-lg text-sm font-medium text-foreground hover:bg-secondary transition-colors duration-150 disabled:opacity-50"
           >
             <svg width="18" height="18" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -108,27 +108,27 @@ export default function Auth() {
 
           <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-tertiary-custom">or</span>
+            <span className="text-xs text-muted-foreground">or</span>
             <div className="flex-1 h-px bg-border" />
           </div>
 
           <form onSubmit={handleEmailAuth} className="space-y-3">
             {isSignUp && (
               <div className="relative">
-                <User size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-tertiary-custom" />
+                <User size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name"
-                  className="w-full h-11 bg-card border border-border rounded-lg pl-10 pr-4 text-sm text-primary-custom placeholder:text-tertiary-custom focus:outline-none focus:border-primary transition-colors" />
+                  className="w-full h-11 bg-card border border-border rounded-lg pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent transition-colors" />
               </div>
             )}
             <div className="relative">
-              <Mail size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-tertiary-custom" />
+              <Mail size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" required
-                className="w-full h-11 bg-card border border-border rounded-lg pl-10 pr-4 text-sm text-primary-custom placeholder:text-tertiary-custom focus:outline-none focus:border-primary transition-colors" />
+                className="w-full h-11 bg-card border border-border rounded-lg pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent transition-colors" />
             </div>
             <div className="relative">
-              <Lock size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-tertiary-custom" />
+              <Lock size={16} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" required minLength={6}
-                className="w-full h-11 bg-card border border-border rounded-lg pl-10 pr-4 text-sm text-primary-custom placeholder:text-tertiary-custom focus:outline-none focus:border-primary transition-colors" />
+                className="w-full h-11 bg-card border border-border rounded-lg pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent transition-colors" />
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
@@ -140,7 +140,7 @@ export default function Auth() {
             </button>
           </form>
 
-          <p className="text-center text-sm text-secondary-custom mt-5">
+          <p className="text-center text-sm text-muted-foreground mt-5">
             {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
             <button onClick={() => { setIsSignUp(!isSignUp); setError(""); setMessage(""); }} className="text-accent font-medium hover:underline">
               {isSignUp ? "Sign in" : "Sign up"}
