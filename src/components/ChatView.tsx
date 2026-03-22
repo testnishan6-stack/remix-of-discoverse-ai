@@ -15,6 +15,7 @@ import { shareUrl } from "@/lib/constants";
 interface Agent {
   id: string; name: string; slug: string; personality: string; greeting_message: string;
   voice_id: string | null; knowledge_areas: string[]; created_by: string | null; avatar_url: string | null;
+  viral_score?: number;
 }
 
 export function ChatView() {
@@ -31,33 +32,71 @@ export function ChatView() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
-  const [input, setInput] = useState("");
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
-  const [showAgentList, setShowAgentList] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const { language } = useApp();
-  const { user } = useAuth();
-  const { messages, isLoading, send, clear, pastConversations, loadConversations, resumeConversation } = useStreamChat();
-  const { speak, stop: stopTTS, isSpeaking } = useTTS();
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const loadAgents = async () => {
-      const { data } = await supabase.from("ai_agents").select("id, name, slug, personality, greeting_message, voice_id, knowledge_areas, created_by, avatar_url").eq("is_published", true);
-      if (data && data.length > 0) setAgents(data);
+      // Algorithmic ordering: viral_score desc, then by conversation count for personalization
+      const { data } = await supabase
+        .from("ai_agents")
+        .select("id, name, slug, personality, greeting_message, voice_id, knowledge_areas, created_by, avatar_url")
+        .eq("is_published", true)
+        .order("created_at", { ascending: false });
+
+      if (data && data.length > 0) {
+        // Sort algorithmically: user's own agents first, then by interaction history
+        let sorted = [...data];
+        if (user) {
+          // Fetch user's conversation history to personalize
+          const { data: convHistory } = await supabase
+            .from("conversation_history")
+            .select("agent_id")
+            .eq("user_id", user.id);
+          const interactionCounts: Record<string, number> = {};
+          (convHistory || []).forEach((c: any) => {
+            interactionCounts[c.agent_id] = (interactionCounts[c.agent_id] || 0) + 1;
+          });
+
+          sorted.sort((a, b) => {
+            // User's agents first
+            const aOwn = a.created_by === user.id ? 1 : 0;
+            const bOwn = b.created_by === user.id ? 1 : 0;
+            if (aOwn !== bOwn) return bOwn - aOwn;
+            // Then by interaction history (most interacted first)
+            const aInt = interactionCounts[a.id] || 0;
+            const bInt = interactionCounts[b.id] || 0;
+            if (aInt !== bInt) return bInt - aInt;
+            // Then newest
+            return 0;
+          });
+        }
+        setAgents(sorted);
+      }
     };
     loadAgents();
-  }, []);
+  }, [user]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { if (textareaRef.current) { textareaRef.current.style.height = "auto"; textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 112) + "px"; } }, [input]);
 
   const selectAgent = (agent: Agent) => { setSelectedAgent(agent); setShowAgentList(false); clear(); if (user) loadConversations(agent.id); };
   const backToAgents = () => { setSelectedAgent(null); setShowAgentList(true); clear(); };
-  const handleSend = (text?: string) => { const msg = text || input.trim(); if (!msg || isLoading) return; send(msg, selectedAgent?.id); setInput(""); };
+
+  const handleSend = async (text?: string) => {
+    const msg = text || input.trim();
+    if (!msg || isLoading) return;
+    if (!canChat) {
+      toast.error("Daily chat limit reached! Upgrade to Pro for unlimited chats.");
+      return;
+    }
+    const ok = await incrementChat();
+    if (!ok) {
+      toast.error("Daily chat limit reached!");
+      return;
+    }
+    send(msg, selectedAgent?.id);
+    setInput("");
+  };
+
   const speakMessage = (text: string) => { if (isSpeaking) { stopTTS(); return; } speak(text, language); };
   const shareAgent = (slug: string) => { navigator.clipboard.writeText(shareUrl(`/agent/${slug}`)); toast.success("Agent link copied!"); };
 
@@ -81,12 +120,17 @@ export function ChatView() {
               <Plus size={14} /> Create
             </button>
           </div>
-          <div className="relative mt-4">
+          <div className="flex items-center justify-between mt-2">
+            <UsageCounter remaining={chatsRemaining} total={3} type="chat" />
+          </div>
+          <div className="relative mt-3">
             <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search agents..."
               className="w-full bg-card border border-border rounded-xl h-11 pl-11 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all" />
           </div>
         </div>
+
+        <UsageLimitBanner type="chat" remaining={chatsRemaining} total={3} />
 
         <div className="flex-1 overflow-y-auto px-5 pb-20 md:pb-4">
           {agents.length === 0 ? (
@@ -144,7 +188,7 @@ export function ChatView() {
 
   // ── Chat View ──
   const hasContent = input.trim().length > 0;
-  const greeting = selectedAgent?.greeting_message || "Namaste! K sikna chahanchau?";
+  const greeting = selectedAgent?.greeting_message || "Namaste! Kya sikhna chahte ho?";
 
   return (
     <div className="flex flex-col h-full">
@@ -169,6 +213,8 @@ export function ChatView() {
           </div>
         </div>
       )}
+
+      <UsageLimitBanner type="chat" remaining={chatsRemaining} total={3} />
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[720px] mx-auto px-4 py-4">
@@ -197,7 +243,7 @@ export function ChatView() {
                 </div>
               )}
               <div className="grid grid-cols-1 gap-2 w-full max-w-sm">
-                {["Explain photosynthesis","DNA structure k ho?","Solar System bare batau","Quantum physics basics"].map((q) => (
+                {["Explain photosynthesis","DNA structure kya hai?","Solar System ke bare mein batao","Quantum physics basics"].map((q) => (
                   <button key={q} onClick={() => handleSend(q)}
                     className="flex items-center gap-3 px-4 py-3.5 bg-card border border-border rounded-xl text-xs text-muted-foreground hover:border-accent hover:text-accent transition-all text-left active:scale-[0.97] group">
                     <Sparkles size={13} className="shrink-0 text-accent group-hover:scale-110 transition-transform" />{q}
@@ -257,14 +303,18 @@ export function ChatView() {
           <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-end gap-2 shadow-sm hover:border-accent/20 transition-colors">
             <textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder={selectedAgent ? `Ask ${selectedAgent.name}...` : "Ask anything..."} rows={1}
-              className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none min-h-[20px] max-h-28 leading-relaxed" />
-            <button onClick={() => handleSend()} disabled={!hasContent || isLoading}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-[0.95] ${hasContent && !isLoading ? "bg-accent text-accent-foreground shadow-md shadow-accent/20" : "bg-border text-muted-foreground"}`}>
+              placeholder={!canChat ? "Daily limit reached — upgrade to Pro" : selectedAgent ? `Ask ${selectedAgent.name}...` : "Ask anything..."} rows={1}
+              disabled={!canChat}
+              className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none min-h-[20px] max-h-28 leading-relaxed disabled:opacity-50" />
+            <button onClick={() => handleSend()} disabled={!hasContent || isLoading || !canChat}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-[0.95] ${hasContent && !isLoading && canChat ? "bg-accent text-accent-foreground shadow-md shadow-accent/20" : "bg-border text-muted-foreground"}`}>
               {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} strokeWidth={1.5} />}
             </button>
           </div>
-          <p className="text-center text-[9px] text-muted-foreground mt-2 opacity-50">{selectedAgent?.name || "Discoverse AI"} · Powered by Discoverse AI</p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-[9px] text-muted-foreground opacity-50">{selectedAgent?.name || "Discoverse AI"} · Powered by Discoverse AI</p>
+            <UsageCounter remaining={chatsRemaining} total={3} type="chat" />
+          </div>
         </div>
       </div>
     </div>
