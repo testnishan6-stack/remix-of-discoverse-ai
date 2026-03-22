@@ -5,6 +5,8 @@ import { useApp } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStreamChat } from "@/hooks/useStreamChat";
 import { useTTS } from "@/hooks/useTTS";
+import { useUsageLimits } from "@/hooks/useUsageLimits";
+import { UsageLimitBanner, UsageCounter } from "@/components/UsageLimitBanner";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
