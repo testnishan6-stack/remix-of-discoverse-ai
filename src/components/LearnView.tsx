@@ -192,6 +192,15 @@ export function LearnView() {
   const handleGenerate = async (topic?: string) => {
     const t = topic || topicInput;
     if (!t.trim()) return;
+    if (!canGenerateModel) {
+      toast.error("Daily 3D generation limit reached! Upgrade to Pro for unlimited access.");
+      return;
+    }
+    const ok = await incrementModelGen();
+    if (!ok) {
+      toast.error("Daily limit reached!");
+      return;
+    }
     setTopicInput(t);
     setIsLoading(true);
     setSimulation(null);
