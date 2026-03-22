@@ -9,9 +9,12 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { ModelViewer, type ProceduralPrimitive } from "./ModelViewer";
 import { useApp } from "@/contexts/AppContext";
 import { useTTS } from "@/hooks/useTTS";
+import { useUsageLimits } from "@/hooks/useUsageLimits";
+import { UsageLimitBanner, UsageCounter } from "@/components/UsageLimitBanner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
 
 interface SimStep {
   title: string;
