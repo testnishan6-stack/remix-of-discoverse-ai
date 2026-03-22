@@ -269,9 +269,27 @@ export function LearnView() {
         });
         if (!genErr && Array.isArray(genData) && genData.length > 0) {
           setProceduralModel(genData as ProceduralPrimitive[]);
-          // Extract part names from generated model
           const genParts = genData.map((p: any) => p.name).filter(Boolean);
           setModelParts(genParts);
+
+          // Save AI-generated model to DB so it appears in library
+          if (user) {
+            const aiSlug = `ai-${slug}-${Date.now()}`;
+            const { data: newModel } = await supabase.from("models").insert({
+              name: t,
+              slug: aiSlug,
+              subject: "science",
+              file_url: `procedural://${aiSlug}`,
+              file_format: "procedural",
+              status: "published",
+              named_parts: genParts,
+              uploaded_by: user.id,
+              keywords_en: words,
+            }).select("id").single();
+            if (newModel) {
+              model = { ...newModel, named_parts: genParts, file_url: `procedural://${aiSlug}`, subject: "science" };
+            }
+          }
         }
       } catch (e) {
         console.error("Procedural model generation failed:", e);
