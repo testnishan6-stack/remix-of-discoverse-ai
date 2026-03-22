@@ -284,10 +284,9 @@ function AgentEditor({ agent, onSave, onCancel }: { agent: any; onSave: (a: any)
             onChange={(e) => update("language_style", e.target.value)}
             className="w-full bg-card border border-border rounded-xl h-10 px-3 text-[13px] text-primary-custom focus:outline-none focus:border-accent"
           >
-            <option value="romanized_nepali">Romanized Nepali (default)</option>
             <option value="english">English</option>
-            <option value="hindi">Hindi (Devanagari)</option>
-            <option value="mixed">Mixed English + Romanized Nepali</option>
+            <option value="hindi">Hindi</option>
+            <option value="mixed">Mixed English + Hindi</option>
           </select>
         </div>
 

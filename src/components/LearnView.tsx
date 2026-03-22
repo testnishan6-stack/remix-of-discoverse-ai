@@ -522,7 +522,7 @@ export function LearnView() {
                     language === l ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-secondary"
                   }`}
                 >
-                  {l === "en" ? "EN" : "ने"}
+                  {l === "en" ? "EN" : "हि"}
                 </button>
               ))}
             </div>
