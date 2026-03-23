@@ -181,12 +181,21 @@ export default function Auth() {
           >
             {phoneLoading ? "Verifying..." : "Verify OTP"}
           </button>
-          <button
-            onClick={() => { setStep("phone-input"); setOtp(""); setPhoneError(""); }}
-            className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Change number or resend
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setStep("phone-input"); setOtp(""); setPhoneError(""); setResendCooldown(0); }}
+              className="flex-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Change number
+            </button>
+            <button
+              onClick={() => { setOtp(""); setPhoneError(""); handleSendOtp(); }}
+              disabled={phoneLoading || resendCooldown > 0}
+              className="flex-1 text-sm text-accent font-medium hover:underline disabled:opacity-50 disabled:no-underline transition-colors"
+            >
+              {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend OTP"}
+            </button>
+          </div>
         </div>
       );
     }
