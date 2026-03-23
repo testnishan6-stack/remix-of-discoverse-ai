@@ -145,7 +145,7 @@ export default function Auth() {
       }
 
       // Redirect will happen via auth state
-      window.location.href = "/app";
+      window.location.href = "https://discoverseai.com/app";
     } catch (err: any) {
       setPhoneError(err.message || "Failed to save profile");
     } finally {
