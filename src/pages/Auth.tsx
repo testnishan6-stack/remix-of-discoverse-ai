@@ -72,6 +72,7 @@ export default function Auth() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setStep("otp-input");
+      startCooldown();
     } catch (err: any) {
       setPhoneError(err.message || "Failed to send OTP");
     } finally {
