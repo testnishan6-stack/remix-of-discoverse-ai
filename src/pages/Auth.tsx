@@ -23,7 +23,7 @@ export default function Auth() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  
 
   const handleGoogleAuth = async () => {
     setLoading(true);
