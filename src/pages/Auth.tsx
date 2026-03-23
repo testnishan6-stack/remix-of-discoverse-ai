@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { Logo } from "@/components/Logo";
-import { Mail, Lock, User, ArrowRight, Phone, Calendar } from "lucide-react";
+import { User, ArrowRight, Phone, Calendar, Mail } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 type AuthStep = "method" | "phone-input" | "otp-input" | "profile-complete";
