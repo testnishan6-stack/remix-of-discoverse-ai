@@ -81,6 +81,32 @@ serve(async (req) => {
       }
     }
 
+    // Check if the latest user message needs live data
+    const lastUserMsg = messages[messages.length - 1]?.content || "";
+    const needsLiveData = /\b(latest|current|recent|today|2024|2025|2026|news|happening|update|score|price|weather|election|trending)\b/i.test(lastUserMsg);
+
+    let webContext = "";
+    if (needsLiveData) {
+      try {
+        const searchResp = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/web-search`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({ query: lastUserMsg }),
+        });
+        if (searchResp.ok) {
+          const searchData = await searchResp.json();
+          if (searchData.summary) {
+            webContext = `\n\n[LIVE DATA CONTEXT - Use this to answer accurately]:\nSummary: ${searchData.summary}\nFacts: ${(searchData.facts || []).join("; ")}`;
+          }
+        }
+      } catch (e) {
+        console.error("Web search failed:", e);
+      }
+    }
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -90,7 +116,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: systemPrompt + webContext },
           ...messages,
         ],
         stream: true,
