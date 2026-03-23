@@ -7,14 +7,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 type AuthStep = "method" | "phone-input" | "otp-input" | "profile-complete";
 
 export default function Auth() {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [authMethod, setAuthMethod] = useState<"email" | "phone">("phone");
   const [step, setStep] = useState<AuthStep>("method");
-
-  // Email state
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
 
   // Phone state
   const [phone, setPhone] = useState("");
