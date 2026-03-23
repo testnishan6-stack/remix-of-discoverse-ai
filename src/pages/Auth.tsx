@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { Logo } from "@/components/Logo";
 import { User, ArrowRight, Phone, Calendar, Mail } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
@@ -45,14 +46,11 @@ export default function Auth() {
   const handleGoogleAuth = async () => {
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: "https://discoverseai.com/",
-      },
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: "https://discoverseai.com/",
     });
-    if (error) {
-      setError(error.message || "Failed to sign in with Google");
+    if (result?.error) {
+      setError(result.error.message || "Failed to sign in with Google");
       setLoading(false);
     }
   };
@@ -147,7 +145,7 @@ export default function Auth() {
       }
 
       // Redirect will happen via auth state
-      window.location.href = "/app";
+      window.location.href = "https://discoverseai.com/app";
     } catch (err: any) {
       setPhoneError(err.message || "Failed to save profile");
     } finally {

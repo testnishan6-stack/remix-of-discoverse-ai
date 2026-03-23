@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Play, Trash2, BookOpen, Share2 } from "lucide-react";
+import { Search, Play, Trash2, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,18 +8,21 @@ import { toast } from "sonner";
 
 const subjects = ["All", "Biology", "Physics", "Chemistry", "Astronomy", "Engineering", "Mathematics", "Science"];
 
+interface LibraryModel {
+  id: string;
+  name: string;
+  subject: string;
+  slug: string;
+  named_parts: string[] | null;
+  file_url: string;
+}
+
 interface LibraryItem {
   id: string;
   model_id: string;
   last_step: number | null;
   created_at: string;
-  models: {
-    name: string;
-    subject: string;
-    slug: string;
-    named_parts: string[] | null;
-    file_url: string;
-  } | null;
+  models: LibraryModel | null;
 }
 
 export default function Library() {
@@ -42,14 +45,27 @@ export default function Library() {
     try {
       const { data, error } = await supabase
         .from("user_library")
-        .select("*, models(name, subject, slug, named_parts, file_url)")
+        .select("*, models(id, name, subject, slug, named_parts, file_url)")
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
+
       if (error) {
         console.error("Library load error:", error);
         toast.error("Failed to load library");
+        setLoading(false);
+        return;
       }
-      setItems((data as LibraryItem[]) || []);
+
+      // Deduplicate: keep only the latest entry per model_id
+      const seen = new Set<string>();
+      const unique: LibraryItem[] = [];
+      for (const item of (data as LibraryItem[]) || []) {
+        if (!item.models) continue;
+        if (seen.has(item.model_id)) continue;
+        seen.add(item.model_id);
+        unique.push(item);
+      }
+      setItems(unique);
     } catch (err) {
       console.error("Library error:", err);
     } finally {
@@ -70,10 +86,25 @@ export default function Library() {
   const filtered = items.filter((item) => {
     const model = item.models;
     if (!model) return false;
-    const matchesSubject = activeSubject === "All" || model.subject.toLowerCase() === activeSubject.toLowerCase();
+    const subjectLower = model.subject.toLowerCase();
+    const matchesSubject =
+      activeSubject === "All" ||
+      subjectLower === activeSubject.toLowerCase() ||
+      subjectLower.includes(activeSubject.toLowerCase());
     const matchesSearch = model.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSubject && matchesSearch;
   });
+
+  const subjectIcon = (subject: string) => {
+    const s = subject.toLowerCase();
+    if (s.includes("bio")) return "🧬";
+    if (s.includes("phys")) return "⚡";
+    if (s.includes("chem")) return "🧪";
+    if (s.includes("astro")) return "🌌";
+    if (s.includes("eng")) return "⚙️";
+    if (s.includes("math")) return "📐";
+    return "🔬";
+  };
 
   return (
     <MainLayout title="Library">
@@ -120,8 +151,14 @@ export default function Library() {
             <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
               <BookOpen size={28} strokeWidth={1} className="text-muted-foreground" />
             </div>
-            <p className="text-sm font-medium text-muted-foreground">No simulations saved yet</p>
-            <p className="text-xs text-muted-foreground mt-1">Explore topics in Chat or Learn mode to save them here</p>
+            <p className="text-sm font-medium text-muted-foreground">
+              {items.length === 0 ? "No simulations saved yet" : "No results for this filter"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {items.length === 0
+                ? "Explore topics in Learn mode to save them here"
+                : "Try a different subject or search term"}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -130,16 +167,16 @@ export default function Library() {
                 key={item.id}
                 className="bg-card border border-border rounded-2xl hover:shadow-lg hover:-translate-y-0.5 hover:border-accent/20 transition-all duration-250 overflow-hidden group"
               >
-                <div className="h-[160px] bg-gradient-to-br from-accent/5 to-secondary flex items-center justify-center relative">
-                  <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center">
-                    <div className="w-8 h-8 rounded-full bg-accent/20" />
-                  </div>
+                <div className="h-[140px] bg-gradient-to-br from-accent/5 to-secondary flex items-center justify-center relative">
+                  <span className="text-4xl">{subjectIcon(item.models?.subject || "")}</span>
                   <span className="absolute top-3 right-3 bg-card/90 backdrop-blur-sm text-[10px] text-muted-foreground px-2.5 py-1 rounded-full font-semibold uppercase tracking-wider">
                     {item.models?.subject}
                   </span>
                 </div>
                 <div className="p-4">
-                  <h3 className="text-sm font-bold text-foreground group-hover:text-accent transition-colors">{item.models?.name}</h3>
+                  <h3 className="text-sm font-bold text-foreground group-hover:text-accent transition-colors truncate">
+                    {item.models?.name}
+                  </h3>
                   <p className="text-[11px] text-muted-foreground mt-1">
                     {new Date(item.created_at).toLocaleDateString()} · Step {(item.last_step || 0) + 1}
                   </p>
