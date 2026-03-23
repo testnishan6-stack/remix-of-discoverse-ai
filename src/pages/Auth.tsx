@@ -46,14 +46,11 @@ export default function Auth() {
   const handleGoogleAuth = async () => {
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: "https://discoverseai.com/",
-      },
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: "https://discoverseai.com/",
     });
-    if (error) {
-      setError(error.message || "Failed to sign in with Google");
+    if (result?.error) {
+      setError(result.error.message || "Failed to sign in with Google");
       setLoading(false);
     }
   };
