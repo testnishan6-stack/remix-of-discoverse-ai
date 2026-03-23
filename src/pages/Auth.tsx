@@ -25,7 +25,6 @@ export default function Auth() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
   const handleGoogleAuth = async () => {
     setLoading(true);
     setError("");
