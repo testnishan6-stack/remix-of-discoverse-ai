@@ -26,37 +26,17 @@ export default function Auth() {
   const [message, setMessage] = useState("");
 
   const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    setMessage("");
-
-    if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: name },
-          emailRedirectTo: "https://discoverseai.com",
-        },
-      });
-      if (error) setError(error.message);
-      else setMessage("Check your email to confirm your account.");
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message);
-    }
-    setLoading(false);
-  };
-
   const handleGoogleAuth = async () => {
     setLoading(true);
     setError("");
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: "https://discoverseai.com",
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "https://discoverseai.com/",
+      },
     });
-    if (result.error) {
-      setError(result.error.message || "Failed to sign in with Google");
+    if (error) {
+      setError(error.message || "Failed to sign in with Google");
       setLoading(false);
     }
   };
