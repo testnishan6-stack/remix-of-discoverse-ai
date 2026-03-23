@@ -279,7 +279,7 @@ export function LearnView() {
 
     setLoadingProgress(30);
 
-    if (model?.file_url) {
+    if (model?.file_url && !model.file_url.startsWith("procedural://")) {
       setModelUrl(model.file_url);
     } else {
       // ── STEP 5: No model in DB → Generate procedural 3D via AI ──
