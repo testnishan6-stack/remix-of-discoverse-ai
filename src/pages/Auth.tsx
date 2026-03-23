@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
 import { User, ArrowRight, Phone, Calendar, Mail } from "lucide-react";
@@ -14,6 +14,23 @@ export default function Auth() {
   const [otp, setOtp] = useState("");
   const [phoneLoading, setPhoneLoading] = useState(false);
   const [phoneError, setPhoneError] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => { if (cooldownRef.current) clearInterval(cooldownRef.current); };
+  }, []);
+
+  const startCooldown = useCallback(() => {
+    setResendCooldown(60);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) { clearInterval(cooldownRef.current!); cooldownRef.current = null; return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
 
   // Profile completion state (new phone users)
   const [profileName, setProfileName] = useState("");
@@ -55,6 +72,7 @@ export default function Auth() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setStep("otp-input");
+      startCooldown();
     } catch (err: any) {
       setPhoneError(err.message || "Failed to send OTP");
     } finally {
@@ -163,12 +181,21 @@ export default function Auth() {
           >
             {phoneLoading ? "Verifying..." : "Verify OTP"}
           </button>
-          <button
-            onClick={() => { setStep("phone-input"); setOtp(""); setPhoneError(""); }}
-            className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Change number or resend
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setStep("phone-input"); setOtp(""); setPhoneError(""); setResendCooldown(0); }}
+              className="flex-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Change number
+            </button>
+            <button
+              onClick={() => { setOtp(""); setPhoneError(""); handleSendOtp(); }}
+              disabled={phoneLoading || resendCooldown > 0}
+              className="flex-1 text-sm text-accent font-medium hover:underline disabled:opacity-50 disabled:no-underline transition-colors"
+            >
+              {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend OTP"}
+            </button>
+          </div>
         </div>
       );
     }

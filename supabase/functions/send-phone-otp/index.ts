@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -28,6 +28,23 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // Rate limit: max 3 OTPs per phone per hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { data: recentOtps, error: countError } = await supabase
+      .from("phone_otps")
+      .select("id")
+      .eq("phone", phone)
+      .gte("created_at", oneHourAgo);
+
+    if (countError) throw countError;
+
+    if (recentOtps && recentOtps.length >= 3) {
+      return new Response(
+        JSON.stringify({ error: "Too many OTP requests. Please try again after some time." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Generate 5-digit OTP
     const otpCode = String(Math.floor(10000 + Math.random() * 90000));
