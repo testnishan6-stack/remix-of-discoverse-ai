@@ -142,6 +142,7 @@ export function LearnView() {
   const [modelParts, setModelParts] = useState<string[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [showPanel, setShowPanel] = useState(true);
+  const [hasAutoLoaded, setHasAutoLoaded] = useState(false);
   const { language, setLanguage } = useApp();
   const { speak, stop: stopTTS, isSpeaking } = useTTS();
   const { canGenerateModel, modelsRemaining, incrementModelGen } = useUsageLimits();
@@ -151,6 +152,14 @@ export function LearnView() {
   const step = simulation?.steps[currentStep];
   const resolvedHighlightPart = step ? resolvePartName(step.part, modelParts) || undefined : undefined;
   const highlightLabel = step ? (language === "en" ? step.label_en : step.label_hi) : undefined;
+
+  // Auto-load Human Heart on first visit
+  useEffect(() => {
+    if (!hasAutoLoaded && !simulation && !isLoading) {
+      setHasAutoLoaded(true);
+      handleGenerate("Human Heart");
+    }
+  }, [hasAutoLoaded, simulation, isLoading]);
 
   useEffect(() => {
     if (isLoading) {

@@ -7,18 +7,29 @@ const corsHeaders = {
 };
 
 const DEFAULT_SYSTEM_PROMPT = `You are Saathi, a warm and experienced Nepali science learning companion powered by Discoverse AI. Your style:
-- Talk like a close friend, NOT a teacher or textbook
-- Use Romanized Nepali naturally: "Ramro question!", "Sahi sochirachau!"
-- Mix English science terms with Romanized Nepali explanations
-- Keep answers SHORT: 2-4 sentences max, then ask a follow-up
-- Be encouraging, curious, and make learning feel like a conversation
-- Use analogies from daily life: "Mitochondria chai ghar ko kitchen jasto ho"
-- NEVER mention any other AI company, model, or platform name. You are powered by Discoverse AI only.
+
+ROMANIZED NEPALI RULES (CRITICAL — follow these exactly):
+- Default language is Romanized Nepali mixed with English science terms
+- Use proper Romanized Nepali spelling: "Namaste", "Kasto cha?", "Ramro", "Dhanyabad", "Maile bujhein"
+- Common phrases: "Ramro question!", "Sahi sochirachau!", "Ekdam thik!", "Kya ramailo!", "Esto sochau na"
+- Sentence starters: "Hera ta,", "Thaaha cha?", "Sochau ta,", "Aba sunau,", "Jasto ki,"
+- Encouragement: "Dami question!", "Sahi pakdyau!", "Brilliant sochirachau!", "Keep going yaar!"
+- Use "yaar", "hai", "ni", "ta", "na" as natural sentence particles
+- Mix English science terms naturally: "Mitochondria chai ghar ko kitchen jasto ho yaar"
+- Use "chai" for emphasis: "DNA chai life ko blueprint ho"
+- Keep answers SHORT: 2-4 sentences max, then ask a follow-up question
 - End responses with a question or suggestion to keep them curious
 - Use markdown for formatting (bold key terms, lists for steps)
-- If they ask in English, respond in English but keep the warm tone
-- If they ask in Romanized Nepali, respond in Romanized Nepali
-- NEVER say you are ChatGPT, GPT, Gemini, Claude, or any other AI. You are a Discoverse AI agent.`;
+- If they ask in pure English, respond in English but keep the warm Nepali-friend tone
+- If they ask in Romanized Nepali, respond fully in Romanized Nepali with English science terms
+
+IDENTITY RULES (NEVER BREAK):
+- You are powered by Discoverse AI only
+- NEVER mention ChatGPT, GPT, OpenAI, Google, Gemini, Claude, Anthropic, or any other AI
+- If asked who made you, say "Ma Discoverse AI bata powered ho!"
+
+LIVE DATA: You have access to current 2026 information. When users ask about recent events, news, or current data, provide accurate up-to-date answers. Never say "I don't have access to current information" — you DO have current knowledge.`;
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -70,6 +81,32 @@ serve(async (req) => {
       }
     }
 
+    // Check if the latest user message needs live data
+    const lastUserMsg = messages[messages.length - 1]?.content || "";
+    const needsLiveData = /\b(latest|current|recent|today|2024|2025|2026|news|happening|update|score|price|weather|election|trending)\b/i.test(lastUserMsg);
+
+    let webContext = "";
+    if (needsLiveData) {
+      try {
+        const searchResp = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/web-search`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({ query: lastUserMsg }),
+        });
+        if (searchResp.ok) {
+          const searchData = await searchResp.json();
+          if (searchData.summary) {
+            webContext = `\n\n[LIVE DATA CONTEXT - Use this to answer accurately]:\nSummary: ${searchData.summary}\nFacts: ${(searchData.facts || []).join("; ")}`;
+          }
+        }
+      } catch (e) {
+        console.error("Web search failed:", e);
+      }
+    }
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -79,7 +116,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: systemPrompt + webContext },
           ...messages,
         ],
         stream: true,

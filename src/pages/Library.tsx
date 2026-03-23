@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { Search, Play, Trash2, BookOpen, Share2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
-const subjects = ["All", "Biology", "Physics", "Chemistry", "Astronomy", "Engineering", "Mathematics"];
+const subjects = ["All", "Biology", "Physics", "Chemistry", "Astronomy", "Engineering", "Mathematics", "Science"];
 
 interface LibraryItem {
   id: string;
@@ -27,24 +28,41 @@ export default function Library() {
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     loadLibrary();
   }, [user]);
 
   const loadLibrary = async () => {
-    const { data } = await supabase
-      .from("user_library")
-      .select("*, models(name, subject, slug, named_parts, file_url)")
-      .eq("user_id", user!.id)
-      .order("created_at", { ascending: false });
-    setItems((data as LibraryItem[]) || []);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from("user_library")
+        .select("*, models(name, subject, slug, named_parts, file_url)")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.error("Library load error:", error);
+        toast.error("Failed to load library");
+      }
+      setItems((data as LibraryItem[]) || []);
+    } catch (err) {
+      console.error("Library error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const removeItem = async (id: string) => {
-    await supabase.from("user_library").delete().eq("id", id);
+    const { error } = await supabase.from("user_library").delete().eq("id", id);
+    if (error) {
+      toast.error("Failed to remove item");
+      return;
+    }
     setItems(items.filter((i) => i.id !== id));
     toast.success("Removed from library");
   };
@@ -126,7 +144,10 @@ export default function Library() {
                     {new Date(item.created_at).toLocaleDateString()} · Step {(item.last_step || 0) + 1}
                   </p>
                   <div className="flex gap-2 mt-3">
-                    <button className="flex-1 flex items-center justify-center gap-1.5 bg-accent text-accent-foreground text-xs font-semibold py-2.5 rounded-xl hover:opacity-90 transition-opacity active:scale-[0.97] shadow-sm">
+                    <button
+                      onClick={() => navigate("/app")}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-accent text-accent-foreground text-xs font-semibold py-2.5 rounded-xl hover:opacity-90 transition-opacity active:scale-[0.97] shadow-sm"
+                    >
                       <Play size={13} strokeWidth={1.5} /> Resume
                     </button>
                     <button
